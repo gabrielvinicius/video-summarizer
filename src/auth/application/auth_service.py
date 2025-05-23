@@ -1,0 +1,64 @@
+from datetime import datetime, timedelta
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+from typing import Optional
+from src.auth.domain.user import User, UserRole
+from src.shared.utils.id_generator import generate_id
+
+# Configurações
+SECRET_KEY = "your-secret-key-here"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+class AuthService:
+    def __init__(self, user_repository):
+        self.user_repository = user_repository
+
+    def create_user(self, email: str, password: str) -> User:
+        """Cria um novo usuário com senha hasheada."""
+        if self.user_repository.find_by_email(email):
+            raise ValueError("Email já registrado")
+
+        user_id = generate_id()
+        hashed_password = pwd_context.hash(password)
+        user = User(
+            id=user_id,
+            email=email,
+            password_hash=hashed_password,
+            roles=[UserRole.USER]
+        )
+        return self.user_repository.save(user)
+
+    def authenticate_user(self, email: str, password: str) -> Optional[User]:
+        """Verifica credenciais e retorna o usuário se válido."""
+        user = self.user_repository.find_by_email(email)
+        if not user or not pwd_context.verify(password, user.password_hash):
+            return None
+        return user
+
+    def create_access_token(self, user: User) -> str:
+        """Gera JWT token para o usuário."""
+        expires = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        payload = {
+            "sub": user.email,
+            "id": user.id,
+            "roles": [role.value for role in user.roles],
+            "exp": expires
+        }
+        return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+    @staticmethod
+    def verify_token(token: str) -> Optional[User]:
+        """Decodifica e valida um JWT token."""
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            return User(
+                id=payload["id"],
+                email=payload["sub"],
+                roles=[UserRole(role) for role in payload["roles"]]
+            )
+        except JWTError:
+            return None

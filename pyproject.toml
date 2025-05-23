@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "video-summarizer"
+version = "0.1.0"
+description = "Sistema de resumo de vídeos com DDD e Modular Monolith"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "^0.85.0"
+uvicorn = "^0.19.0"
+python-jose = "^3.3.0"       # JWT
+passlib = "^1.7.4"           # Hash de senhas
+sqlalchemy = "^1.4.41"       # ORM
+asyncpg = "^0.27.0"          # Async PostgreSQL
+celery = "^5.2.7"            # Tarefas assíncronas
+redis = "^4.4.0"             # Broker para Celery
+boto3 = "^1.26.41"           # AWS S3
+openai = "^0.27.2"           # Resumos com GPT-4
+python-multipart = "^0.0.6"  # Upload de arquivos no FastAPI
+pydantic = "^1.10.2"         # Validação de dados
+python-dotenv = "^0.21.0"    # Variáveis de ambiente
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.2.0"
+pytest-asyncio = "^0.20.3"
+httpx = "^0.23.3"            # Testes de API
+factory-boy = "^3.2.1"       # Fixtures
