@@ -1,9 +1,12 @@
 from fastapi import APIRouter, UploadFile, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from src.auth.api.dependencies import get_current_user
+from src.auth.domain.user import User
 from src.video_management.application.video_service import VideoService
 from schemas import VideoUploadRequest, VideoResponse, VideoDetailResponse
 from typing import List
+
+from src.video_management.domain.video import Video
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -56,3 +59,33 @@ async def download_video(video_id: str, video_service: VideoService = Depends())
         filename=video.file_path.split("/")[-1],
         content=file_content
     )
+
+@router.get("/", response_model=List[VideoResponse])
+async def list_videos(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    videos = db.query(Video).offset(skip).limit(limit).all()
+    return videos
+
+@router.get("/me", response_model=List[VideoResponse])
+async def list_user_videos(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return db.query(Video).filter(Video.user_id == user.id).all()
+
+from fastapi.responses import StreamingResponse
+
+@router.get("/{video_id}/stream")
+async def stream_video(video_id: str, db: Session = Depends(get_db)):
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Vídeo não encontrado")
+
+    def iterfile():
+        with open(video.file_path, mode="rb") as file:
+            yield from file
+
+    return StreamingResponse(iterfile(), media_type="video/mp4")

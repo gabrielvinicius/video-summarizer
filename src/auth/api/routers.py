@@ -40,3 +40,11 @@ async def login(
 @router.get("/me", response_model=UserResponse)
 async def read_current_user(current_user: User = Depends(get_current_user)):  # Usuário autenticado
     return current_user
+
+@router.get("/users", response_model=List[UserResponse])
+async def list_users(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin_user)  # Somente admin
+):
+    users = db.query(User).all()
+    return users
