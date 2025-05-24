@@ -1,5 +1,7 @@
 # auth/infrastructure/dependencies.py
 from fastapi import Depends
+from sqlalchemy.orm import Session
+
 from src.auth.application.auth_service import AuthService
 from src.auth.infrastructure.user_repository import UserRepository
 from src.shared.infrastructure.database import get_db

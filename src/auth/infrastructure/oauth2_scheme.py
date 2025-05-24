@@ -1,7 +1,10 @@
 # auth/infrastructure/oauth2_scheme.py
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+
+from src.auth.api.dependencies import get_auth_service
 from src.auth.application.auth_service import AuthService
+from src.auth.domain.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 

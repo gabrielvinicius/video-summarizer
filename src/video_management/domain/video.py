@@ -12,7 +12,7 @@ class VideoStatus(str, Enum):
 
 
 class Video(BaseModel):
-    id: str  # UUID
+    id: int  # UUID
     user_id: str  # ID do usuário (relacionamento com auth module)
     file_path: str  # Caminho no storage (ex: "videos/{user_id}/{video_id}.mp4")
     status: VideoStatus = VideoStatus.UPLOADED

@@ -1,6 +1,6 @@
 # transcription/application/event_handlers.py
 from src.shared.events.event_bus import EventBus
-from ..tasks.tasks import process_transcription_task
+from src.transcription.tasks.tasks import process_transcription_task
 
 
 def register_event_handlers(event_bus: EventBus):

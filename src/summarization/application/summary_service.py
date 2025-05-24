@@ -30,7 +30,7 @@ class SummaryService:
 
             # 2. Cria a entidade Summary
             summary = Summary(
-                id=generate_id(),
+                id=None,
                 transcription_id=transcription_id,
                 video_id=transcription.video_id
             )

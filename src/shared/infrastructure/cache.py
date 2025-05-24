@@ -1,4 +1,6 @@
 # shared/infrastructure/cache.py
+from typing import Optional
+
 import redis
 
 

@@ -9,7 +9,7 @@ class VideoUploadRequest(BaseModel):
 
 
 class VideoResponse(BaseModel):
-    id: str
+    id: int
     status: str
     created_at: datetime
     download_url: Optional[str] = None

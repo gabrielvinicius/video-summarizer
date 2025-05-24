@@ -3,7 +3,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from typing import Optional
 from src.auth.domain.user import User, UserRole
-from src.shared.utils.id_generator import generate_id
+#from src.shared.utils.id_generator import generate_id
 
 # Configurações
 SECRET_KEY = "your-secret-key-here"
@@ -14,18 +14,19 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class AuthService:
-    def __init__(self, user_repository):
+    def __init__(self, user_repository,secret_key,algorithm):
         self.user_repository = user_repository
+        self.secret_key = secret_key
+        self.algorithm = algorithm
 
     def create_user(self, email: str, password: str) -> User:
         """Cria um novo usuário com senha hasheada."""
         if self.user_repository.find_by_email(email):
             raise ValueError("Email já registrado")
 
-        user_id = generate_id()
         hashed_password = pwd_context.hash(password)
         user = User(
-            id=user_id,
+            id=None,
             email=email,
             password_hash=hashed_password,
             roles=[UserRole.USER]

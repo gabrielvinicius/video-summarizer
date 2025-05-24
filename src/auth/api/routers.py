@@ -1,9 +1,11 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from ..application.auth_service import AuthService
-from dependencies import get_auth_service, get_current_user
+from dependencies import get_auth_service, get_current_user, get_current_admin_user
 from schemas import Token, UserResponse, UserCreate
 from ..domain.user import User
 from ..infrastructure.user_repository import UserRepository

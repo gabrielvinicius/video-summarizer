@@ -17,8 +17,8 @@ class NotificationStatus(str, Enum):
 
 
 class Notification(BaseModel):
-    id: str  # UUID
-    user_id: str  # ID do usuário (auth module)
+    id: int | None = None
+    user_id: int  # ID do usuário (auth module)
     type: NotificationType
     content: str  # Corpo da mensagem
     status: NotificationStatus = NotificationStatus.PENDING

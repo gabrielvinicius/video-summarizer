@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List
 from enum import Enum
 
@@ -9,11 +9,14 @@ class UserRole(str, Enum):
 
 
 class User(BaseModel):
-    id: str  # UUID
-    email: str  # Email único
+    id: int | None = None
+    email: EmailStr  # Email único
     password_hash: str  # Hash bcrypt
     is_active: bool = True
     roles: List[UserRole] = [UserRole.USER]
 
     def has_role(self, role: UserRole) -> bool:
         return role in self.roles
+
+    class Config:
+        orm_mode = True

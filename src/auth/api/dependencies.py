@@ -7,6 +7,7 @@ from typing import Annotated
 from pydantic import BaseSettings
 
 from src.auth.application.auth_service import AuthService
+from src.auth.domain.user import User, UserRole
 from src.auth.infrastructure.user_repository import UserRepository
 from src.shared.infrastructure.database import get_db
 from sqlalchemy.orm import Session
@@ -41,6 +42,27 @@ async def get_current_user(
     try:
         user = auth_service.verify_token(token)
         if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token inválido ou expirado",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return user
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Não foi possível validar as credenciais",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+async def get_current_admin_user(
+        token: Annotated[str, Depends(oauth2_scheme)],
+        auth_service: AuthService = Depends(get_auth_service)
+) -> User:
+    """Valida o token JWT e retorna o usuário autenticado."""
+    try:
+        user = auth_service.verify_token(token)
+        if not user and user.roles==[UserRole.ADMIN]:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token inválido ou expirado",

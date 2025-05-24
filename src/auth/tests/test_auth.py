@@ -1,7 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from auth.domain.user import User
 from main import app  # Importe sua aplicação FastAPI
 
 client = TestClient(app)

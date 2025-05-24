@@ -1,12 +1,13 @@
 from celery import shared_task
 from ..application.summary_service import SummaryService
-from src.shared.events.event_bus import get_event_bus
+from src.shared.events.event_bus import EventBus
+from ..infrastructure.huggingface_adapter import HuggingFaceSummarizer
 
 
 @shared_task
 def generate_summary_task(transcription_id: str):
-    event_bus = get_event_bus()
-    llm_adapter = ...  # Injetar OpenAI/HuggingFace
+    event_bus = EventBus()
+    llm_adapter = HuggingFaceSummarizer()  # Injetar OpenAI/HuggingFace
     summary_repo = ...
     transcription_repo = ...
     video_repo = ...

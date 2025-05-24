@@ -18,6 +18,6 @@ class UserRepository:
         """Busca usuário por email."""
         return self.db.query(User).filter(User.email == email).first()
 
-    def find_by_id(self, user_id: str) -> Optional[User]:
+    def find_by_id(self, user_id: id) -> Optional[User]:
         """Busca usuário por ID."""
         return self.db.query(User).filter(User.id == user_id).first()

@@ -1,6 +1,6 @@
 from typing import Optional
 from ..domain.transcription import Transcription, TranscriptionStatus
-from video_management.domain.video import VideoStatus
+from src.video_management.domain.video import VideoStatus
 from src.shared.events.event_bus import EventBus
 from src.storage.application.storage_service import StorageService
 
