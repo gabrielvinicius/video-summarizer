@@ -3,6 +3,8 @@ from ..domain.transcription import Transcription, TranscriptionStatus
 from src.video_management.domain.video import VideoStatus
 from src.shared.events.event_bus import EventBus
 from src.storage.application.storage_service import StorageService
+from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
+from src.video_management.infrastructure.video_repository import VideoRepository
 
 
 class TranscriptionService:
@@ -11,8 +13,8 @@ class TranscriptionService:
             speech_adapter,  # Adaptador para Whisper/Google
             storage_service: StorageService,
             event_bus: EventBus,
-            transcription_repository,
-            video_repository
+            transcription_repository: TranscriptionRepository ,
+            video_repository : VideoRepository
     ):
         self.speech_adapter = speech_adapter
         self.storage_service = storage_service
