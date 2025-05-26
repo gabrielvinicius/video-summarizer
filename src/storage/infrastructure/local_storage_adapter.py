@@ -1,11 +1,13 @@
 #src/storage/infrastructure/local_storage_adapter.py
+from abc import ABC
+
 from src.storage.application.storage_service import StorageService
 from typing import Optional
 import aiofiles
 import os
 
 
-class LocalStorageAdapter(StorageService):
+class LocalStorageAdapter(StorageService, ABC):
     def __init__(self, base_path: str = "uploads"):
         self.base_path = base_path
         os.makedirs(base_path, exist_ok=True)

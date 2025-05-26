@@ -5,12 +5,13 @@ from typing import Optional
 from src.auth.domain.user import User, UserRole
 from src.shared.config.auth_settings import AuthSettings
 
-#from src.shared.utils.id_generator import generate_id
+# from src.shared.utils.id_generator import generate_id
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 settings = AuthSettings()
+
 
 class AuthService:
     def __init__(self, user_repository):

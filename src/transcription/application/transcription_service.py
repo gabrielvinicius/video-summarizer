@@ -34,7 +34,7 @@ class TranscriptionService:
             self.video_repo.save(video)
 
             # 2. Cria a entidade Transcription
-            transcription = Transcription(id=generate_id(), video_id=video_id)
+            transcription = Transcription(video_id=video_id)
             self.transcription_repo.save(transcription)
 
             # 3. Faz download do arquivo
