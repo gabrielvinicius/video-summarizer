@@ -1,3 +1,4 @@
+import uuid
 from enum import Enum
 from typing import Optional
 
@@ -12,7 +13,7 @@ class TranscriptionStatus(str, Enum):
 
 
 class Transcription(BaseModel):
-    id: str  # UUID
+    id: str = uuid.uuid4()  # UUID
     video_id: str  # ID do vídeo relacionado
     text: str  # Texto transcrito
     status: TranscriptionStatus = TranscriptionStatus.PROCESSING

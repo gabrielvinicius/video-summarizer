@@ -1,10 +1,14 @@
 from fastapi import APIRouter, UploadFile, Depends, HTTPException, status
 from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+
 from src.auth.api.dependencies import get_current_user
 from src.auth.domain.user import User
 from src.video_management.application.video_service import VideoService
-from schemas import VideoUploadRequest, VideoResponse, VideoDetailResponse
+from .schemas import VideoUploadRequest, VideoResponse, VideoDetailResponse
 from typing import List
+from src.video_management.api.dependencies import get_video_service
+from src.shared.infrastructure.database import get_db
 
 from src.video_management.domain.video import Video
 
@@ -15,7 +19,7 @@ router = APIRouter(prefix="/videos", tags=["videos"])
 async def upload_video(
         file: UploadFile,
         current_user: dict = Depends(get_current_user),
-        video_service: VideoService = Depends(),
+        video_service: VideoService = Depends(get_video_service),
 ):
     try:
         video_data = await file.read()
@@ -33,7 +37,7 @@ async def upload_video(
 
 
 @router.get("/{video_id}", response_model=VideoDetailResponse)
-async def get_video_details(video_id: str, video_service: VideoService = Depends()):
+async def get_video_details(video_id: str, video_service: VideoService = Depends(get_video_service)):
     video = video_service.get_video_by_id(video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado")
@@ -48,7 +52,7 @@ async def get_video_details(video_id: str, video_service: VideoService = Depends
 
 
 @router.get("/{video_id}/download")
-async def download_video(video_id: str, video_service: VideoService = Depends()):
+async def download_video(video_id: str, video_service: VideoService = Depends(get_video_service)):
     video = video_service.get_video_by_id(video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado")

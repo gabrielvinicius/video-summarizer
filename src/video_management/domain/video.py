@@ -1,3 +1,4 @@
+import uuid
 from enum import Enum
 from pydantic import BaseModel
 from datetime import datetime
@@ -12,8 +13,8 @@ class VideoStatus(str, Enum):
 
 
 class Video(BaseModel):
-    id: int  # UUID
-    user_id: str  # ID do usuário (relacionamento com auth module)
+    id: int  =  uuid.uuid4() # UUID
+    user_id: int  # ID do usuário (relacionamento com auth module)
     file_path: str  # Caminho no storage (ex: "videos/{user_id}/{video_id}.mp4")
     status: VideoStatus = VideoStatus.UPLOADED
     created_at: datetime = datetime.utcnow()

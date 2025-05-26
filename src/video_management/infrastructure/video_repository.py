@@ -13,10 +13,10 @@ class VideoRepository:
         self.db.refresh(video)
         return video
 
-    def find_by_id(self, video_id: int) -> Optional[Video]:
+    def find_by_id(self, video_id: str) -> Optional[Video]:
         return self.db.query(Video).filter(Video.id == video_id).first()
 
-    def update_status(self, video_id: int, status: VideoStatus):
+    def update_status(self, video_id: str, status: VideoStatus):
         video = self.find_by_id(video_id)
         if video:
             video.status = status

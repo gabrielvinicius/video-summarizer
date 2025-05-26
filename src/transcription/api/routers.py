@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from src.transcription.application.transcription_service import TranscriptionService
+
 from .schemas import TranscriptionResponse
 
 router = APIRouter(prefix="/transcriptions", tags=["transcriptions"])

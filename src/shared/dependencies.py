@@ -1,6 +1,8 @@
 from typing import Generator
+
+from fastapi import Depends
 from sqlalchemy.orm import Session
-from src.shared.infrastructure.database import SessionLocal
+from src.shared.infrastructure.database import AsyncSessionLocal
 from src.auth.infrastructure.user_repository import UserRepository
 from src.video_management.infrastructure.video_repository import VideoRepository
 from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
@@ -8,7 +10,7 @@ from src.summarization.infrastructure.summary_repository import SummaryRepositor
 from src.notifications.infrastructure.notification_repository import NotificationRepository
 
 def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
+    db = AsyncSessionLocal()
     try:
         yield db
     finally:

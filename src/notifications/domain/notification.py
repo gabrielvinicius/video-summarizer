@@ -1,3 +1,4 @@
+import uuid
 from enum import Enum
 from pydantic import BaseModel
 from datetime import datetime
@@ -17,7 +18,7 @@ class NotificationStatus(str, Enum):
 
 
 class Notification(BaseModel):
-    id: int | None = None
+    id: str = uuid.uuid4()
     user_id: int  # ID do usuário (auth module)
     type: NotificationType
     content: str  # Corpo da mensagem

@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 from src.video_management.domain.video import Video, VideoStatus
 from src.storage.application.storage_service import StorageService
+from src.video_management.infrastructure.video_repository import VideoRepository
 from src.shared.events.event_bus import EventBus
 
 
@@ -11,7 +12,7 @@ class VideoService:
             self,
             storage_service: StorageService,
             event_bus: EventBus,
-            video_repository
+            video_repository: VideoRepository
     ):
         self.storage_service = storage_service
         self.event_bus = event_bus

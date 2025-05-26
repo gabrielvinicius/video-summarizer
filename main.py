@@ -3,8 +3,9 @@ from src.auth.api.routers import router as auth_router
 from src.video_management.api.routers import router as video_router
 from src.summarization.api.routers import router as summary_router
 from src.notifications.api.routers import router as notification_router
+from src.transcription.api.routers import router as transcription_router
 from src.shared.infrastructure.database import Base, engine
-from src.shared.events.event_bus import EventBus
+from src.shared.events.event_bus import get_event_bus
 from src.transcription.application.event_handlers import register_event_handlers as register_transcription_handlers
 from src.summarization.application.event_handlers import register_event_handlers as register_summary_handlers
 from src.notifications.application.event_handlers import register_event_handlers as register_notification_handlers
@@ -13,7 +14,7 @@ from src.notifications.application.event_handlers import register_event_handlers
 Base.metadata.create_all(bind=engine)
 
 # Configuração do barramento de eventos
-event_bus = EventBus()
+event_bus = get_event_bus()
 
 # Registra handlers de eventos de todos os módulos
 register_transcription_handlers(event_bus)
@@ -25,6 +26,7 @@ app = FastAPI()
 # Registra rotas
 app.include_router(auth_router)
 app.include_router(video_router)
+app.include_router(transcription_router)
 app.include_router(summary_router)
 app.include_router(notification_router)
 

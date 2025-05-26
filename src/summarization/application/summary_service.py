@@ -3,16 +3,18 @@ from ..domain.summary import Summary, SummaryStatus
 from src.transcription.domain.transcription import TranscriptionStatus
 from src.shared.events.event_bus import EventBus
 from src.video_management.domain.video import VideoStatus
-
+from src.video_management.infrastructure.video_repository import VideoRepository
+from src.summarization.infrastructure.summary_repository import SummaryRepository
+from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
 
 class SummaryService:
     def __init__(
             self,
             llm_adapter,  # Adaptador para OpenAI/HuggingFace
             event_bus: EventBus,
-            summary_repository,
-            transcription_repository,
-            video_repository
+            summary_repository : SummaryRepository,
+            transcription_repository : TranscriptionRepository,
+            video_repository : VideoRepository
     ):
         self.llm_adapter = llm_adapter
         self.event_bus = event_bus

@@ -1,3 +1,4 @@
+import uuid
 from enum import Enum
 from pydantic import BaseModel
 from datetime import datetime
@@ -11,7 +12,7 @@ class SummaryStatus(str, Enum):
 
 
 class Summary(BaseModel):
-    id: str  # UUID
+    id: str =  uuid.uuid4()   # UUID
     transcription_id: str  # ID da transcrição relacionada
     video_id: str  # ID do vídeo relacionado
     content: str  # Texto do resumo
