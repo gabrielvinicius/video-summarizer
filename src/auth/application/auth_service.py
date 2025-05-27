@@ -1,10 +1,13 @@
 from datetime import datetime, timedelta
+from uuid import UUID
+
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from typing import Optional
 from src.auth.domain.user import User, UserRole
 from src.shared.config.auth_settings import AuthSettings
 from src.shared.utils.id_generator import generate_id
+from src.auth.infrastructure.user_repository import UserRepository
 
 # from src.shared.utils.id_generator import generate_id
 
@@ -15,7 +18,7 @@ settings = AuthSettings()
 
 
 class AuthService:
-    def __init__(self, user_repository):
+    def __init__(self, user_repository: UserRepository):
         self.user_repository = user_repository
         self.secret_key = settings.secret_key
         self.algorithm = settings.algorithm
@@ -28,26 +31,24 @@ class AuthService:
 
         hashed_password = pwd_context.hash(password)
         user = User(id=generate_id(),
-            email=email,
-            password_hash=hashed_password,
-            roles=[UserRole.USER]
-        )
-        return self.user_repository.save(user)
+                    email=email,
+                    password_hash=hashed_password,
+                    role=UserRole.USER
+                    )
+        return await self.user_repository.save(user)
 
-    def authenticate_user(self, email: str, password: str) -> Optional[User]:
-        """Verifica credenciais e retorna o usuário se válido."""
-        user = self.user_repository.find_by_email(email)
+    async def authenticate_user(self, email: str, password: str) -> Optional[User]:
+        user = await self.user_repository.find_by_email(email)
         if not user or not pwd_context.verify(password, user.password_hash):
             return None
         return user
 
     def create_access_token(self, user: User) -> str:
-        """Gera JWT token para o usuário."""
         expires = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
         payload = {
             "sub": user.email,
-            "id": user.id,
-            "roles": [role.value for role in user.roles],
+            "id": str(user.id),
+            "role": user.role.value,  # 👈 agora só um role
             "exp": expires
         }
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
@@ -55,12 +56,16 @@ class AuthService:
     @staticmethod
     def verify_token(token: str) -> Optional[User]:
         """Decodifica e valida um JWT token."""
+        from src.shared.dependencies import get_user_repository
         try:
             payload = jwt.decode(token, settings.secret_key, algorithms=settings.algorithm)
+            # user: User = get_user_repository().find_by_id(UUID(payload["id"]))
+            # return user
             return User(
-                id=payload["id"],
+                id=UUID(payload["id"]),
                 email=payload["sub"],
-                roles=[UserRole(role) for role in payload["roles"]]
+                role=UserRole(payload["role"]),
+                is_active=True
             )
         except JWTError:
             return None

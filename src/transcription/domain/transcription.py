@@ -1,29 +1,27 @@
-import uuid
-from enum import Enum
-from typing import Optional
-
-from pydantic import BaseModel
+from sqlalchemy import Column, String, DateTime, Enum as SqlEnum, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from src.shared.infrastructure.database import Base
 from datetime import datetime
+import enum
+import uuid
 
 
-class TranscriptionStatus(str, Enum):
+class TranscriptionStatus(str, enum.Enum):
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
 
-class Transcription(BaseModel):
-    id: str = uuid.uuid4()  # UUID
-    video_id: str  # ID do vídeo relacionado
-    text: str  # Texto transcrito
-    status: TranscriptionStatus = TranscriptionStatus.PROCESSING
-    created_at: datetime = datetime.utcnow()
-    processed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+class Transcription(Base):
+    __tablename__ = "transcriptions"
 
-    model_config = {
-        "from_attributes": True  # ✅ novo
-    }
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id"), nullable=False)
+    text = Column(String, nullable=True)
+    status = Column(SqlEnum(TranscriptionStatus), default=TranscriptionStatus.PROCESSING, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    processed_at = Column(DateTime, nullable=True)
+    error_message = Column(String, nullable=True)
 
     def mark_as_completed(self, text: str):
         self.text = text

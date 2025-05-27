@@ -1,5 +1,4 @@
 from typing import Optional
-
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -14,7 +13,15 @@ class VideoResponse(BaseModel):
     created_at: datetime
     download_url: Optional[str] = None
 
+    model_config = {
+        "from_attributes": True
+    }
+
 
 class VideoDetailResponse(VideoResponse):
     transcription: Optional[str] = None
     summary: Optional[str] = None
+
+    model_config = {
+        "from_attributes": True
+    }

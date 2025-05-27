@@ -1,9 +1,10 @@
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from src.notifications.domain.notification import Notification
 
 
 class NotificationRepository:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     def find_by_id(self, notification_id: str) -> Notification | None:

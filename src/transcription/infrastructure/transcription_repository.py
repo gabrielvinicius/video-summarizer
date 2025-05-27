@@ -1,9 +1,10 @@
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from src.transcription.domain.transcription import Transcription
 
 
 class TranscriptionRepository:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     def find_by_id(self, transcription_id: str) -> Transcription | None:

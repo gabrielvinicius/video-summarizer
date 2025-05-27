@@ -2,6 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+
 class SummaryResponse(BaseModel):
     id: str
     video_id: str

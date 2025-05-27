@@ -1,29 +1,28 @@
-import uuid
-from enum import Enum
-from pydantic import BaseModel
+from sqlalchemy import Column, String, DateTime, Enum as SqlEnum
+from sqlalchemy.dialects.postgresql import UUID
+from src.shared.infrastructure.database import Base
 from datetime import datetime
-from typing import Optional
+import enum
+import uuid
 
 
-class SummaryStatus(str, Enum):
+class SummaryStatus(str, enum.Enum):
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
 
-class Summary(BaseModel):
-    id: str =  uuid.uuid4()   # UUID
-    transcription_id: str  # ID da transcrição relacionada
-    video_id: str  # ID do vídeo relacionado
-    content: str  # Texto do resumo
-    status: SummaryStatus = SummaryStatus.PROCESSING
-    created_at: datetime = datetime.utcnow()
-    processed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+class Summary(Base):
+    __tablename__ = "summaries"
 
-    model_config = {
-        "from_attributes": True  # ✅ novo
-    }
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    transcription_id = Column(UUID(as_uuid=True), nullable=False)
+    video_id = Column(UUID(as_uuid=True), nullable=False)
+    content = Column(String, nullable=True)
+    status = Column(SqlEnum(SummaryStatus), default=SummaryStatus.PROCESSING, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    processed_at = Column(DateTime, nullable=True)
+    error_message = Column(String, nullable=True)
 
     def mark_as_completed(self, content: str):
         self.content = content

@@ -1,17 +1,16 @@
 from typing import Optional
 from src.notifications.domain.notification import Notification, NotificationStatus, NotificationType
-from src.auth.domain.user import User
-from src.shared.events.event_bus import EventBus
+from src.shared.utils.id_generator import generate_id
 
 
 class NotificationService:
     def __init__(
-            self,
-            email_adapter,  # Adaptador para SMTP
-            sms_adapter,  # Adaptador para Twilio
-            webhook_adapter,  # Adaptador para webhook
-            notification_repository,
-            user_repository  # Repositório do módulo auth
+        self,
+        email_adapter,  # Adaptador para SMTP
+        sms_adapter,  # Adaptador para Twilio
+        webhook_adapter,  # Adaptador para webhook
+        notification_repository,
+        user_repository  # Repositório do módulo auth
     ):
         self.email_adapter = email_adapter
         self.sms_adapter = sms_adapter
@@ -20,13 +19,13 @@ class NotificationService:
         self.user_repo = user_repository
 
     async def send_notification(
-            self,
-            user_id: str,
-            message: str,
-            notification_type: NotificationType
+        self,
+        user_id: str,
+        message: str,
+        notification_type: NotificationType
     ) -> Notification:
         """Envia uma notificação e persiste o status."""
-        user = self.user_repo.find_by_id(user_id)
+        user = await self.user_repo.find_by_id(user_id)
         if not user:
             raise ValueError("Usuário não encontrado")
 
@@ -36,7 +35,7 @@ class NotificationService:
             type=notification_type,
             content=message
         )
-        self.notification_repo.save(notification)
+        await self.notification_repo.save(notification)
 
         try:
             if notification_type == NotificationType.EMAIL:
@@ -50,5 +49,5 @@ class NotificationService:
         except Exception as e:
             notification.mark_as_failed(str(e))
 
-        self.notification_repo.save(notification)
+        await self.notification_repo.save(notification)
         return notification

@@ -1,12 +1,39 @@
-from datetime import datetime
+from pydantic import BaseModel, Field
 from typing import Optional
+from uuid import UUID
+from datetime import datetime
+from enum import Enum
 
-from pydantic import BaseModel
+
+class NotificationType(str, Enum):
+    EMAIL = "EMAIL"
+    SMS = "SMS"
+    WEBHOOK = "WEBHOOK"
 
 
-class NotificationResponse(BaseModel):
-    id: int
-    type: str
-    status: str
+class NotificationStatus(str, Enum):
+    PENDING = "PENDING"
+    SENT = "SENT"
+    FAILED = "FAILED"
+
+
+class NotificationBase(BaseModel):
+    type: NotificationType
     content: str
-    sent_at: Optional[datetime] = None
+
+
+class NotificationCreate(NotificationBase):
+    user_id: int
+
+
+class NotificationResponse(NotificationBase):
+    id: UUID
+    user_id: int
+    status: NotificationStatus
+    created_at: datetime
+    sent_at: Optional[datetime]
+    retries: int
+    error_message: Optional[str]
+
+    class Config:
+        from_attributes = True  # Para funcionar com ORM

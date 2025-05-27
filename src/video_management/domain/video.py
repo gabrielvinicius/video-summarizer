@@ -1,8 +1,10 @@
 import uuid
-from enum import Enum
-from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from enum import Enum
+
+from sqlalchemy import Column, String, Enum as SqlEnum, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from src.shared.infrastructure.database import Base
 
 
 class VideoStatus(str, Enum):
@@ -12,18 +14,16 @@ class VideoStatus(str, Enum):
     FAILED = "FAILED"
 
 
-class Video(BaseModel):
-    id: int  =  uuid.uuid4() # UUID
-    user_id: int  # ID do usuário (relacionamento com auth module)
-    file_path: str  # Caminho no storage (ex: "videos/{user_id}/{video_id}.mp4")
-    status: VideoStatus = VideoStatus.UPLOADED
-    created_at: datetime = datetime.utcnow()
-    transcription_id: Optional[str] = None  # Relacionamento com transcription module
-    summary_id: Optional[str] = None  # Relacionamento com summarization module
+class Video(Base):
+    __tablename__ = "videos"
 
-    model_config = {
-        "from_attributes": True  # ✅ novo
-    }
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    file_path = Column(String, nullable=False)
+    status = Column(SqlEnum(VideoStatus), default=VideoStatus.UPLOADED, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    transcription_id = Column(UUID(as_uuid=True), ForeignKey("transcriptions.id"), nullable=True)
+    summary_id = Column(UUID(as_uuid=True),ForeignKey("summaries.id"), nullable=True)
 
     def mark_as_processing(self):
         self.status = VideoStatus.PROCESSING

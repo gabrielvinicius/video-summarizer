@@ -1,42 +1,33 @@
 import uuid
-from enum import Enum
-from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from enum import Enum as PyEnum
+
+from sqlalchemy import Column, String, DateTime, Enum, Integer, Text, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from src.shared.infrastructure.database import Base
 
 
-class NotificationType(str, Enum):
+class NotificationType(PyEnum):
     EMAIL = "EMAIL"
     SMS = "SMS"
     WEBHOOK = "WEBHOOK"
 
 
-class NotificationStatus(str, Enum):
+class NotificationStatus(PyEnum):
     PENDING = "PENDING"
     SENT = "SENT"
     FAILED = "FAILED"
 
 
-class Notification(BaseModel):
-    id: str = uuid.uuid4()
-    user_id: int  # ID do usuário (auth module)
-    type: NotificationType
-    content: str  # Corpo da mensagem
-    status: NotificationStatus = NotificationStatus.PENDING
-    created_at: datetime = datetime.utcnow()
-    sent_at: Optional[datetime] = None
-    retries: int = 0
-    error_message: Optional[str] = None
+class Notification(Base):
+    __tablename__ = "notifications"
 
-    model_config = {
-        "from_attributes": True  # ✅ novo
-    }
-
-    def mark_as_sent(self):
-        self.status = NotificationStatus.SENT
-        self.sent_at = datetime.utcnow()
-
-    def mark_as_failed(self, error: str):
-        self.status = NotificationStatus.FAILED
-        self.error_message = error
-        self.retries += 1
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    type = Column(Enum(NotificationType), nullable=False)
+    content = Column(Text, nullable=False)
+    status = Column(Enum(NotificationStatus), default=NotificationStatus.PENDING)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    sent_at = Column(DateTime, nullable=True)
+    retries = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)

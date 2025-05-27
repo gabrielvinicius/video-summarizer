@@ -24,6 +24,19 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/login", response_model=Token)
+async def login_json(
+    login_data: LoginData,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    user = await auth_service.authenticate_user(login_data.username, login_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas"
+        )
+    token = auth_service.create_access_token(user)
+    return {"access_token": token, "token_type": "bearer"}
 
 @router.post("/login", response_model=Token)
 async def login(
@@ -44,10 +57,11 @@ async def login(
 async def read_current_user(current_user: User = Depends(get_current_user)):  # Usuário autenticado
     return current_user
 
+
 @router.get("/users", response_model=List[UserResponse])
 async def list_users(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_admin_user)
+        db: AsyncSession = Depends(get_db),
+        _: User = Depends(get_current_admin_user)
 ):
     result = await db.execute(select(User))
     users = result.scalars().all()

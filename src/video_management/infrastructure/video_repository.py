@@ -1,10 +1,11 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+# from sqlalchemy.orm import Session
 from src.video_management.domain.video import Video,VideoStatus
 from typing import Optional
 
 
 class VideoRepository:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     def save(self, video: Video) -> Video:

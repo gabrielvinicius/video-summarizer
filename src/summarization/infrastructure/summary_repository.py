@@ -1,9 +1,10 @@
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from src.summarization.domain.summary import Summary
 
 
 class SummaryRepository:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     def find_by_id(self, summary_id: str) -> Summary | None:

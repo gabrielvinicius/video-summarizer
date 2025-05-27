@@ -64,23 +64,27 @@ async def download_video(video_id: str, video_service: VideoService = Depends(ge
         content=file_content
     )
 
+
 @router.get("/", response_model=List[VideoResponse])
 async def list_videos(
-    skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db)
+        skip: int = 0,
+        limit: int = 100,
+        db: Session = Depends(get_db)
 ):
     videos = db.query(Video).offset(skip).limit(limit).all()
     return videos
 
+
 @router.get("/me", response_model=List[VideoResponse])
 async def list_user_videos(
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
 ):
     return db.query(Video).filter(Video.user_id == user.id).all()
 
+
 from fastapi.responses import StreamingResponse
+
 
 @router.get("/{video_id}/stream")
 async def stream_video(video_id: str, db: Session = Depends(get_db)):

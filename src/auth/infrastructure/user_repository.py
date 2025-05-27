@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from src.auth.domain.user import User
@@ -21,7 +23,7 @@ class UserRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def find_by_id(self, user_id: str) -> Optional[User]:
+    async def find_by_id(self, user_id: UUID) -> Optional[User]:
         """Busca usuário por ID."""
         stmt = select(User).where(User.id == user_id)
         result = await self.db.execute(stmt)

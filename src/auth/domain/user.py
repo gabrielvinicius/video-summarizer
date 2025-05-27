@@ -1,8 +1,8 @@
-import uuid
-
-from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, List
 from enum import Enum
+from sqlalchemy import Column, String, Boolean, Enum as SQLAEnum
+from sqlalchemy.dialects.postgresql import UUID
+from src.shared.infrastructure.database import Base
+import uuid
 
 
 class UserRole(str, Enum):
@@ -10,17 +10,11 @@ class UserRole(str, Enum):
     ADMIN = "admin"
 
 
-class User(BaseModel):
-    id: str = uuid.uuid4()
-    email: EmailStr  # Email poúnico
-    password_hash: str  # Hash bcrypt
-    is_active: bool = True
-    roles: List[UserRole] = [UserRole.USER]
-    videos: List[int] = None
+class User(Base):
+    __tablename__ = "users"
 
-    model_config = {
-        "from_attributes": True  # ✅ novo
-    }
-
-    def has_role(self, role: UserRole) -> bool:
-        return role in self.roles
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    role = Column(SQLAEnum(UserRole, name="user_role_enum"), default=UserRole.USER, nullable=False)
