@@ -21,6 +21,10 @@ class Transcription(BaseModel):
     processed_at: Optional[datetime] = None
     error_message: Optional[str] = None
 
+    model_config = {
+        "from_attributes": True  # ✅ novo
+    }
+
     def mark_as_completed(self, text: str):
         self.text = text
         self.status = TranscriptionStatus.COMPLETED

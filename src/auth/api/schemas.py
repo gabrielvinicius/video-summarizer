@@ -12,8 +12,11 @@ class Token(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
+    id: str
     email: str
     is_active: bool
-    class Config:
-        orm_mode = True
+
+    model_config = {
+        "from_attributes": True  # ✅ novo
+    }
+

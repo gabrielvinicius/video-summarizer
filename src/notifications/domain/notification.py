@@ -28,6 +28,10 @@ class Notification(BaseModel):
     retries: int = 0
     error_message: Optional[str] = None
 
+    model_config = {
+        "from_attributes": True  # ✅ novo
+    }
+
     def mark_as_sent(self):
         self.status = NotificationStatus.SENT
         self.sent_at = datetime.utcnow()

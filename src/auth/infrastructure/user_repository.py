@@ -1,23 +1,28 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from src.auth.domain.user import User
 from typing import Optional
 
 
 class UserRepository:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def save(self, user: User) -> User:
+    async def save(self, user: User) -> User:
         """Salva usuário no banco de dados."""
         self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
+        await self.db.commit()
+        await self.db.refresh(user)
         return user
 
-    def find_by_email(self, email: str) -> Optional[User]:
+    async def find_by_email(self, email: str) -> Optional[User]:
         """Busca usuário por email."""
-        return self.db.query(User).filter(User.email == email).first()
+        stmt = select(User).where(User.email == email)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 
-    def find_by_id(self, user_id: id) -> Optional[User]:
+    async def find_by_id(self, user_id: str) -> Optional[User]:
         """Busca usuário por ID."""
-        return self.db.query(User).filter(User.id == user_id).first()
+        stmt = select(User).where(User.id == user_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()

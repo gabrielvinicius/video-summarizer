@@ -21,6 +21,10 @@ class Video(BaseModel):
     transcription_id: Optional[str] = None  # Relacionamento com transcription module
     summary_id: Optional[str] = None  # Relacionamento com summarization module
 
+    model_config = {
+        "from_attributes": True  # ✅ novo
+    }
+
     def mark_as_processing(self):
         self.status = VideoStatus.PROCESSING
 

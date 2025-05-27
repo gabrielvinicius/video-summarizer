@@ -4,6 +4,7 @@ from jose import JWTError, jwt
 from typing import Optional
 from src.auth.domain.user import User, UserRole
 from src.shared.config.auth_settings import AuthSettings
+from src.shared.utils.id_generator import generate_id
 
 # from src.shared.utils.id_generator import generate_id
 
@@ -18,15 +19,15 @@ class AuthService:
         self.user_repository = user_repository
         self.secret_key = settings.secret_key
         self.algorithm = settings.algorithm
-        self.acess_token_expire_minutes = settings.acess_token_expire_minutes
+        self.access_token_expire_minutes = settings.access_token_expire_minutes
 
-    def create_user(self, email: str, password: str) -> User:
+    async def create_user(self, email: str, password: str) -> User:
         """Cria um novo usuário com senha hasheada."""
-        if self.user_repository.find_by_email(email):
+        if await self.user_repository.find_by_email(email):
             raise ValueError("Email já registrado")
 
         hashed_password = pwd_context.hash(password)
-        user = User(
+        user = User(id=generate_id(),
             email=email,
             password_hash=hashed_password,
             roles=[UserRole.USER]
@@ -42,7 +43,7 @@ class AuthService:
 
     def create_access_token(self, user: User) -> str:
         """Gera JWT token para o usuário."""
-        expires = datetime.utcnow() + timedelta(minutes=self.acess_token_expire_minutes)
+        expires = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
         payload = {
             "sub": user.email,
             "id": user.id,

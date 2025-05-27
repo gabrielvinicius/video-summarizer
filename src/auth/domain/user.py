@@ -12,14 +12,15 @@ class UserRole(str, Enum):
 
 class User(BaseModel):
     id: str = uuid.uuid4()
-    email: EmailStr  # Email único
+    email: EmailStr  # Email poúnico
     password_hash: str  # Hash bcrypt
     is_active: bool = True
     roles: List[UserRole] = [UserRole.USER]
     videos: List[int] = None
 
+    model_config = {
+        "from_attributes": True  # ✅ novo
+    }
+
     def has_role(self, role: UserRole) -> bool:
         return role in self.roles
-
-    class Config:
-        orm_mode = True

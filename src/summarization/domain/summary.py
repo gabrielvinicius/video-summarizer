@@ -21,6 +21,10 @@ class Summary(BaseModel):
     processed_at: Optional[datetime] = None
     error_message: Optional[str] = None
 
+    model_config = {
+        "from_attributes": True  # ✅ novo
+    }
+
     def mark_as_completed(self, content: str):
         self.content = content
         self.status = SummaryStatus.COMPLETED
