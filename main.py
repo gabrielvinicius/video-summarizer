@@ -6,6 +6,11 @@ from src.summarization.api.routers import router as summary_router
 from src.notifications.api.routers import router as notification_router
 from src.transcription.api.routers import router as transcription_router
 from src.shared.infrastructure.database import Base, engine
+from src.auth.domain.user import User
+from src.notifications.domain.notification import Notification
+from src.transcription.domain.transcription import Transcription
+from src.video_management.domain.video import Video
+from src.summarization.domain.summary import Summary
 from src.shared.events.event_bus import get_event_bus
 from src.transcription.application.event_handlers import register_event_handlers as register_transcription_handlers
 from src.summarization.application.event_handlers import register_event_handlers as register_summary_handlers

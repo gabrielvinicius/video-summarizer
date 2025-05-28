@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.application.auth_service import AuthService
 from src.auth.api.dependencies import get_auth_service, get_current_user, get_current_admin_user
-from src.auth.api.schemas import Token, UserResponse, UserCreate
+from src.auth.api.schemas import Token, UserResponse, UserCreate, LoginJSON
 from src.auth.domain.user import User
 from src.auth.infrastructure.user_repository import UserRepository
 from src.shared.infrastructure.database import get_db
@@ -26,7 +26,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 async def login_json(
-    login_data: LoginData,
+    login_data: LoginJSON,
     auth_service: AuthService = Depends(get_auth_service)
 ):
     user = await auth_service.authenticate_user(login_data.username, login_data.password)
@@ -38,20 +38,20 @@ async def login_json(
     token = auth_service.create_access_token(user)
     return {"access_token": token, "token_type": "bearer"}
 
-@router.post("/login", response_model=Token)
-async def login(
-        form_data: OAuth2PasswordRequestForm = Depends(),
-        auth_service: AuthService = Depends(get_auth_service)
+
+@router.post("/login", response_model=Token, include_in_schema=False)
+async def login_form(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    auth_service: AuthService = Depends(get_auth_service)
 ):
     user = await auth_service.authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciais inválidas",
+            detail="Credenciais inválidas"
         )
     token = auth_service.create_access_token(user)
     return {"access_token": token, "token_type": "bearer"}
-
 
 @router.get("/me", response_model=UserResponse)
 async def read_current_user(current_user: User = Depends(get_current_user)):  # Usuário autenticado

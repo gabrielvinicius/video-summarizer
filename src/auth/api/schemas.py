@@ -2,7 +2,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr
 
-
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -22,3 +21,7 @@ class UserResponse(BaseModel):
         "from_attributes": True  # ✅ novo
     }
 
+
+class LoginJSON(BaseModel):
+    username: str
+    password: str

@@ -10,7 +10,6 @@ from src.video_management.infrastructure.video_repository import VideoRepository
 from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
 from src.summarization.infrastructure.summary_repository import SummaryRepository
 from src.notifications.infrastructure.notification_repository import NotificationRepository
-from src.storage.infrastructure.local_storage_adapter import LocalStorageAdapter
 from src.shared.infrastructure.database import get_db
 
 
@@ -32,7 +31,3 @@ def get_summary_repository(db: AsyncSession = Depends(get_db)) -> SummaryReposit
 
 def get_notification_repository(db: AsyncSession = Depends(get_db)) -> NotificationRepository:
     return NotificationRepository(db)
-
-
-def get_storage_service() -> StorageService:
-    return LocalStorageAdapter()
