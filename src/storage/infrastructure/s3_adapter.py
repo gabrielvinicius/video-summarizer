@@ -1,6 +1,6 @@
 # src/storage/infrastructure/s3_storage_adapter.py
 from src.auth.application.auth_service import settings
-from src.storage.application.storage_service import StorageService
+from src.storage.application.storage_service import StorageService, StorageException
 from typing import Optional, Union
 from pathlib import Path
 import logging
@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 from src.shared.config.storage_settings import StorageSettings
 
 settings = StorageSettings()
+
 
 class S3StorageAdapter(StorageService):
     def __init__(

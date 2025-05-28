@@ -1,66 +1,48 @@
 # src/auth/api/dependencies.py
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError
 from typing import Annotated
-from src.shared.config.auth_settings import AuthSettings
+from jose import JWTError
 
-from sqlalchemy.orm import Session
-
-from src.auth.application.auth_service import AuthService
 from src.auth.domain.user import User, UserRole
+from src.auth.utils.token import verify_token
 from src.auth.infrastructure.user_repository import UserRepository
-from src.shared.infrastructure.database import get_db
+from src.auth.application.auth_service import AuthService
+from src.shared.dependencies import get_user_repository
 
-# Configuração do esquema OAuth2
+# OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
-def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
-    user_repository = UserRepository(db)
-    return AuthService(
-        user_repository=user_repository
-    )
+def get_auth_service(user_repository: UserRepository = Depends(get_user_repository)) -> AuthService:
+    return AuthService(user_repository=user_repository)
 
 
 async def get_current_user(
-        token: Annotated[str, Depends(oauth2_scheme)],
-        auth_service: AuthService = Depends(get_auth_service),
+    token: Annotated[str, Depends(oauth2_scheme)],
+    user_repo: UserRepository = Depends(get_user_repository)
 ) -> User:
-    try:
-        user = auth_service.verify_token(token)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token inválido ou expirado",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        return user
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Não foi possível validar as credenciais",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    user = await user_repo.find_by_id(UUID(payload["sub"]))
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Usuário inativo ou inexistente")
+
+    return user
+
 
 
 async def get_current_admin_user(
-        token: Annotated[str, Depends(oauth2_scheme)],
-        auth_service: AuthService = Depends(get_auth_service),
+    current_user: User = Depends(get_current_user),
 ) -> User:
-    try:
-        user = auth_service.verify_token(token)
-        if not user and UserRole.ADMIN not in user.roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acesso restrito a administradores",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        return user
-    except JWTError:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Não foi possível validar as credenciais",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a administradores",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    return current_user

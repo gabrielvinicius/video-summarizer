@@ -1,6 +1,6 @@
 from uuid import uuid4
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Sequence
 from src.video_management.domain.video import Video, VideoStatus
 from src.storage.application.storage_service import StorageService
 from src.video_management.infrastructure.video_repository import VideoRepository
@@ -33,7 +33,7 @@ class VideoService:
             file_path=file_path,
             status=VideoStatus.UPLOADED
         )
-        self.video_repository.save(video)
+        await self.video_repository.save(video)
 
         # Dispara evento para processamento assíncrono
         await self.event_bus.publish("video_uploaded", {
@@ -44,5 +44,11 @@ class VideoService:
 
         return video
 
-    def get_video_by_id(self, video_id: str) -> Optional[Video]:
-        return self.video_repository.find_by_id(video_id)
+    async def get_video_by_id(self, video_id: str) -> Optional[Video]:
+        return await self.video_repository.find_by_id(video_id)
+
+    async def list_all_videos(self, skip: int = 0, limit: int = 100) -> Sequence[Video]:
+        return await self.video_repository.list_all(skip, limit)
+
+    async def list_user_videos(self, user_id: str) -> Sequence[Video]:
+        return await self.video_repository.list_by_user(user_id)

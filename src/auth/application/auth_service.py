@@ -8,6 +8,7 @@ from src.auth.domain.user import User, UserRole
 from src.shared.config.auth_settings import AuthSettings
 from src.shared.utils.id_generator import generate_id
 from src.auth.infrastructure.user_repository import UserRepository
+from src.auth.utils.token import create_access_token as token_util_create, verify_token as token_util_verify
 
 # from src.shared.utils.id_generator import generate_id
 
@@ -44,28 +45,7 @@ class AuthService:
         return user
 
     def create_access_token(self, user: User) -> str:
-        expires = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
-        payload = {
-            "sub": user.email,
-            "id": str(user.id),
-            "role": user.role.value,  # 👈 agora só um role
-            "exp": expires
-        }
-        return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
+        return token_util_create(user)
 
-    @staticmethod
-    def verify_token(token: str) -> Optional[User]:
-        """Decodifica e valida um JWT token."""
-        from src.shared.dependencies import get_user_repository
-        try:
-            payload = jwt.decode(token, settings.secret_key, algorithms=settings.algorithm)
-            # user: User = get_user_repository().find_by_id(UUID(payload["id"]))
-            # return user
-            return User(
-                id=UUID(payload["id"]),
-                email=payload["sub"],
-                role=UserRole(payload["role"]),
-                is_active=True
-            )
-        except JWTError:
-            return None
+    def verify_token(self,token: str) -> Optional[User]:
+        return token_util_verify(token)
