@@ -14,7 +14,7 @@ def register_storage(provider: str):
 
 def get_storage_service() -> StorageService:
     settings = StorageSettings()
-    provider = settings.storage_provider
+    provider = settings.provider
 
     if provider not in _storage_registry:
         raise ValueError(f"Storage provider '{provider}' não está registrado")
