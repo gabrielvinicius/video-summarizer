@@ -8,7 +8,7 @@ from sqlalchemy import select
 from main import app  # sua app FastAPI principal
 from src.shared.infrastructure.database import get_db
 from src.video_management.domain.video import Video
-from src.auth.application.auth_service import create_access_token  # sua função real
+from src.auth.utils.token import create_access_token  # sua função real
 
 from tests.utils.db import override_get_db, setup_test_db
 
