@@ -21,8 +21,8 @@ def get_auth_service(user_repository: UserRepository = Depends(get_user_reposito
 
 
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    user_repo: UserRepository = Depends(get_user_repository)
+        token: Annotated[str, Depends(oauth2_scheme)],
+        user_repo: UserRepository = Depends(get_user_repository)
 ) -> User:
     payload = verify_token(token)
     if not payload:
@@ -35,9 +35,8 @@ async def get_current_user(
     return user
 
 
-
 async def get_current_admin_user(
-    current_user: User = Depends(get_current_user),
+        current_user: User = Depends(get_current_user),
 ) -> User:
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(

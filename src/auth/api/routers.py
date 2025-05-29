@@ -24,10 +24,11 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @router.post("/login", response_model=Token)
 async def login_json(
-    login_data: LoginJSON,
-    auth_service: AuthService = Depends(get_auth_service)
+        login_data: LoginJSON,
+        auth_service: AuthService = Depends(get_auth_service)
 ):
     user = await auth_service.authenticate_user(login_data.username, login_data.password)
     if not user:
@@ -41,8 +42,8 @@ async def login_json(
 
 @router.post("/login", response_model=Token, include_in_schema=False)
 async def login_form(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    auth_service: AuthService = Depends(get_auth_service)
+        form_data: OAuth2PasswordRequestForm = Depends(),
+        auth_service: AuthService = Depends(get_auth_service)
 ):
     user = await auth_service.authenticate_user(form_data.username, form_data.password)
     if not user:
@@ -52,6 +53,7 @@ async def login_form(
         )
     token = auth_service.create_access_token(user)
     return {"access_token": token, "token_type": "bearer"}
+
 
 @router.get("/me", response_model=UserResponse)
 async def read_current_user(current_user: User = Depends(get_current_user)):  # Usuário autenticado
