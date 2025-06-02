@@ -1,7 +1,7 @@
 # src/video_management/api/routers.py
 
 import io
-from typing import List
+from typing import List, Sequence
 from uuid import UUID
 
 from fastapi import APIRouter, UploadFile, Depends, HTTPException, status
@@ -13,6 +13,7 @@ from src.auth.domain.user import User
 from src.video_management.api.dependencies import get_video_service
 from src.video_management.application.video_service import VideoService
 from .schemas import VideoResponse, VideoDetailResponse
+from ..domain.video import Video
 
 router = APIRouter(
     prefix="/videos",
@@ -28,7 +29,7 @@ async def upload_video(
 ):
     try:
         video_data = await file.read()
-        video = await video_service.upload_video(current_user.id, video_data, file.filename)
+        video: Video = await video_service.upload_video(current_user.id, video_data, file.filename)
         return jsonable_encoder(VideoResponse(
             id=video.id,
             status=video.status.value,
@@ -49,9 +50,9 @@ async def list_videos(
     video_service: VideoService = Depends(get_video_service),
 ):
     if user.role.value == "admin":
-        videos = await video_service.list_all_videos(skip, limit)
+        videos: Sequence[Video] = await video_service.list_all_videos(skip, limit)
     else:
-        videos = await video_service.list_user_videos(user.id)
+        videos: Sequence[Video] = await video_service.list_user_videos(user.id)
     return jsonable_encoder(videos)
 
 
@@ -60,7 +61,7 @@ async def get_video_details(
     video_id: UUID,
     video_service: VideoService = Depends(get_video_service)
 ):
-    video = await video_service.get_video_by_id(str(video_id))
+    video: Video = await video_service.get_video_by_id(str(video_id))
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado")
 
@@ -78,7 +79,7 @@ async def download_video(
     video_id: UUID,
     video_service: VideoService = Depends(get_video_service)
 ):
-    video = await video_service.get_video_by_id(str(video_id))
+    video: Video = await video_service.get_video_by_id(str(video_id))
     if not video:
         raise HTTPException(status_code=404, detail="Vídeo não encontrado")
 

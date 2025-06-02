@@ -1,8 +1,7 @@
-from sqlalchemy import select, Row, RowMapping
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.orm import Session
-from src.video_management.domain.video import Video,VideoStatus
-from typing import Optional, Any, Sequence
+from src.video_management.domain.video import Video, VideoStatus
+from typing import Optional, Sequence
 
 
 class VideoRepository:
@@ -27,11 +26,14 @@ class VideoRepository:
         result = await self.db.execute(select(Video).where(Video.user_id == user_id))
         return result.scalars().all()
 
-    async def update_status(self, video_id: str, status: VideoStatus):
-        video = self.find_by_id(video_id)
+    async def update_status(self, video_id: str, status: VideoStatus) -> Optional[Video]:
+        video = await self.find_by_id(video_id)  # Fixed: added await
         if video:
             video.status = status
             await self.db.commit()
+            await self.db.refresh(video)  # Ensure refreshed state
+            return video
+        return None
 
     async def delete(self, video_id: str) -> bool:
         video = await self.find_by_id(video_id)
@@ -42,5 +44,7 @@ class VideoRepository:
         return True
 
     async def exists(self, video_id: str) -> bool:
-        video = await self.find_by_id(video_id)
-        return video is not None
+        # Optimized existence check
+        stmt = select(select(Video).where(Video.id == video_id).exists())
+        result = await self.db.execute(stmt)
+        return result.scalar()

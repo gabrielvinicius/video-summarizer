@@ -45,10 +45,13 @@ class VideoService:
         return video
 
     async def get_video_by_id(self, video_id: str) -> Optional[Video]:
-        return await self.video_repository.find_by_id(video_id)
+        video = await self.video_repository.find_by_id(video_id)
+        return video
 
     async def list_all_videos(self, skip: int = 0, limit: int = 100) -> Sequence[Video]:
-        return await self.video_repository.list_all(skip, limit)
+        videos: Sequence[Video] = await self.video_repository.list_all(skip, limit)
+        return videos
 
     async def list_user_videos(self, user_id: str) -> Sequence[Video]:
-        return await self.video_repository.list_by_user(user_id)
+        videos: Sequence[Video] = await self.video_repository.list_by_user(user_id)
+        return videos
