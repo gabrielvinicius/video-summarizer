@@ -1,6 +1,9 @@
 # src/storage/infrastructure/dependencies.py
 
 from typing import Dict, Type
+
+from dotenv import load_dotenv
+
 from src.storage.application.storage_service import StorageService
 from src.shared.config.storage_settings import StorageSettings
 import importlib
@@ -20,6 +23,7 @@ def register_storage(provider: str):
 
 
 def get_storage_service() -> StorageService:
+    load_dotenv()
     _load_storage_plugins()  # Lazy-load dos providers
     settings = StorageSettings()
     provider = settings.provider

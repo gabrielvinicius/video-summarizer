@@ -28,6 +28,31 @@ services:
     volumes:
       - minio_data:/data
 
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      - app
+      - redis
+    command: celery -A src.shared.events.event_bus.celery worker --loglevel=info --pool=solo
+
 volumes:
   postgres_data:
   minio_data:

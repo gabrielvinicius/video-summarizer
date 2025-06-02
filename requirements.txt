@@ -1,0 +1,16 @@
+fastapi>=0.115.12
+SQLAlchemy>=2.0.41
+pydantic>=2.11.5
+pytest>=8.3.5
+passlib>=1.7.4
+redis>=6.1.0
+celery>=5.5.2
+aioboto3>=14.3.0
+botocore>=1.37.3
+python-dotenv>=1.1.0
+aiohttp>=3.11.18
+openai>=1.82.0
+transformers>=4.52.3
+httpx>=1.0.0b0
+alembic>=1.16.1
+uvicorn>=0.34.2

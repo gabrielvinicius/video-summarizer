@@ -6,6 +6,7 @@ import aiohttp
 from pathlib import Path
 from typing import Union, Optional
 
+
 @register_storage("s3")
 class S3StorageService(StorageService):
     def __init__(self):
@@ -17,6 +18,7 @@ class S3StorageService(StorageService):
             aws_secret_access_key=self.settings.secret_key,
             endpoint_url=self.settings.endpoint_url,
         )
+        self.client.create_bucket(Bucket=self.settings.bucket_name)
 
     async def upload(self, file_path: Union[str, Path], file: bytes) -> None:
         try:

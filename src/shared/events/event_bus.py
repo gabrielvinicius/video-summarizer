@@ -1,15 +1,22 @@
-# event_bus.py
+# src/shared/events/event_bus.py
+
 from celery import Celery
 from typing import Dict, Callable, Any, Optional
 import redis
 import json
 import threading
 import time
+import asyncio  # ✅ Importado para lidar com coroutines
 from src.shared.config.broker_settings import BrokerSettings
 
 settings = BrokerSettings()
 
 celery = Celery(__name__, broker=settings.redis_url)
+celery.autodiscover_tasks([
+    "src.transcription.tasks",
+    "src.summarization.tasks",
+    "src.notifications.tasks",
+])
 redis_client = redis.Redis(
     host=settings.redis_host,
     port=settings.redis_port,
@@ -30,9 +37,16 @@ class EventBus:
     def publish(self, event_type: str, data: Any):
         if event_type in self.subscribers:
             for handler in self.subscribers[event_type]:
-                handler(data)
+                if asyncio.iscoroutinefunction(handler):
+                    asyncio.create_task(handler(data))  # ✅ dispara a coroutine
+                else:
+                    handler(data)
 
-        redis_client.publish(event_type, json.dumps(data))
+        # Serializa para Redis (UUIDs devem ser convertidos para string antes)
+        try:
+            redis_client.publish(event_type, json.dumps(data, default=str))  # ✅ default=str para UUIDs
+        except TypeError as e:
+            raise ValueError(f"Erro ao serializar payload: {e}")
 
     def start_listener(self):
         def run():
@@ -47,7 +61,10 @@ class EventBus:
                             data = json.loads(message["data"])
                             if event_type in self.subscribers:
                                 for handler in self.subscribers[event_type]:
-                                    handler(data)
+                                    if asyncio.iscoroutinefunction(handler):
+                                        asyncio.create_task(handler(data))
+                                    else:
+                                        handler(data)
                 except Exception as e:
                     print(f"[EventBus] Redis error: {e}. Retrying in 5s...")
                     time.sleep(5)
@@ -58,6 +75,7 @@ class EventBus:
 
 # Instância global singleton
 _event_bus_instance: Optional[EventBus] = None
+
 
 def get_event_bus() -> EventBus:
     global _event_bus_instance

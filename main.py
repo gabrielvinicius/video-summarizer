@@ -1,3 +1,4 @@
+# main.py
 import asyncio
 from fastapi import FastAPI
 from src.auth.api.routers import router as auth_router
@@ -5,12 +6,8 @@ from src.video_management.api.routers import router as video_router
 from src.summarization.api.routers import router as summary_router
 from src.notifications.api.routers import router as notification_router
 from src.transcription.api.routers import router as transcription_router
+
 from src.shared.infrastructure.database import Base, engine
-from src.auth.domain.user import User
-from src.notifications.domain.notification import Notification
-from src.transcription.domain.transcription import Transcription
-from src.video_management.domain.video import Video
-from src.summarization.domain.summary import Summary
 from src.shared.events.event_bus import get_event_bus
 from src.transcription.application.event_handlers import register_event_handlers as register_transcription_handlers
 from src.summarization.application.event_handlers import register_event_handlers as register_summary_handlers
@@ -38,10 +35,13 @@ async def init_models():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+
 # Inicializa o banco ao iniciar a aplicação
 @app.on_event("startup")
 async def on_startup():
     await init_models()
+    event_bus.start_listener()  # <--- INICIA O OUVINTE DE EVENTOS
+
 
 if __name__ == "__main__":
     import uvicorn
