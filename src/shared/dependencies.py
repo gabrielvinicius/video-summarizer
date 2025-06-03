@@ -13,21 +13,21 @@ from src.notifications.infrastructure.notification_repository import Notificatio
 from src.shared.infrastructure.database import get_db
 
 
-def get_user_repository(db: AsyncSession = Depends(get_db)) -> UserRepository:
+async def get_user_repository(db: AsyncSession = Depends(get_db)) -> UserRepository:
     return UserRepository(db)
 
 
-def get_video_repository(db: AsyncSession = Depends(get_db)) -> VideoRepository:
+async def get_video_repository(db: AsyncSession = Depends(get_db)) -> VideoRepository:
     return VideoRepository(db)
 
 
-def get_transcription_repository(db: AsyncSession = Depends(get_db)) -> TranscriptionRepository:
+async def get_transcription_repository(db: AsyncSession = Depends(get_db)) -> TranscriptionRepository:
     return TranscriptionRepository(db)
 
 
-def get_summary_repository(db: AsyncSession = Depends(get_db)) -> SummaryRepository:
+async def get_summary_repository(db: AsyncSession = Depends(get_db)) -> SummaryRepository:
     return SummaryRepository(db)
 
 
-def get_notification_repository(db: AsyncSession = Depends(get_db)) -> NotificationRepository:
+async def get_notification_repository(db: AsyncSession = Depends(get_db)) -> NotificationRepository:
     return NotificationRepository(db)

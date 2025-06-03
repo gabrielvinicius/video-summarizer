@@ -1,28 +1,67 @@
+from typing import Sequence, Optional
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
+from sqlalchemy import select, delete, and_
 from src.transcription.domain.transcription import Transcription
+from src.video_management.domain.video import Video
 
 
 class TranscriptionRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    def find_by_id(self, transcription_id: str) -> Transcription | None:
-        return self.db.query(Transcription).filter(Transcription.id == transcription_id).first()
+    async def find_by_id(self, transcription_id: UUID) -> Optional[Transcription]:
+        """Finds a transcription by its ID."""
+        result = await self.db.execute(
+            select(Transcription)
+            .where(Transcription.id == transcription_id)
+            .execution_options(populate_existing=True)
+        )
+        return result.scalar_one_or_none()
 
-    def save(self, transcription: Transcription) -> Transcription:
-        self.db.add(transcription)
-        self.db.commit()
-        self.db.refresh(transcription)
+    async def save(self, transcription: Transcription) -> Transcription:
+        """Saves a transcription entity."""
+        async with self.db.begin_nested():
+            self.db.add(transcription)
+            await self.db.commit()
+            await self.db.refresh(transcription)
         return transcription
 
-    def list_by_user(self, user_id: str) -> list[Transcription]:
-        return self.db.query(Transcription).filter(Transcription.user_id == user_id).all()
+    async def list_by_user(self, user_id: UUID, limit: int = 100, offset: int = 0) -> Sequence[Transcription]:
+        result = await self.db.execute(
+            select(Transcription)
+            .join(Video, Transcription.video_id == Video.id)
+            .where(Video.user_id == user_id)
+            .order_by(Transcription.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        return result.scalars().all()
 
-    def delete(self, transcription_id: str) -> bool:
-        transcription = self.find_by_id(transcription_id)
-        if transcription:
-            self.db.delete(transcription)
-            self.db.commit()
-            return True
-        return False
+    async def delete(self, transcription_id: UUID) -> bool:
+        """Deletes a transcription by ID."""
+        async with self.db.begin_nested():
+            stmt = (delete(Transcription)
+                .where(Transcription.id == transcription_id)
+                .returning(Transcription.id))
+            result = await self.db.execute(stmt)
+            deleted = result.scalar() is not None
+            await self.db.commit()
+            return deleted
+
+    async def find_by_video_id(self, video_id: UUID) -> Optional[Transcription]:
+        """Finds transcription by associated video ID."""
+        result = await self.db.execute(
+            select(Transcription)
+            .where(Transcription.video_id == video_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def exists(self, transcription_id: UUID) -> bool:
+        """Checks if a transcription exists."""
+        stmt = select(select(Transcription)
+            .where(Transcription.id == transcription_id)
+            .exists()
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar()

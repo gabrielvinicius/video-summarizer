@@ -30,7 +30,6 @@ def get_storage_service() -> StorageService:
 
     if provider not in _storage_registry:
         raise ValueError(f"Storage provider '{provider}' não está registrado")
-
     return _storage_registry[provider]()  # Cria instância do provider
 
 

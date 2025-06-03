@@ -12,7 +12,7 @@ class StorageService(ABC):
     """
 
     @abstractmethod
-    async def upload(self, file_path: Union[str, Path], file: bytes) -> None:
+    async def upload(self, file_path: Union[str, Path], file: bytes) -> bool:
         """
         Store a file in the storage system.
 
