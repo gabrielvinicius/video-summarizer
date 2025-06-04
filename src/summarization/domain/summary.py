@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Enum as SqlEnum, ForeignKey
+from sqlalchemy import Column, String, DateTime, Enum as SqlEnum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, relationship
 
@@ -23,7 +23,7 @@ class Summary(Base):
     transcription_id = Column(UUID(as_uuid=True), ForeignKey("transcriptions.id"), nullable=False, unique=True)
     transcription: Mapped["Transcription"] = relationship(back_populates="summary")
     #video_id = Column(UUID(as_uuid=True), nullable=False)
-    content = Column(String, nullable=True)
+    text = Column(Text, nullable=True)
     status = Column(SqlEnum(SummaryStatus), default=SummaryStatus.PROCESSING, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     processed_at = Column(DateTime, nullable=True)

@@ -50,7 +50,7 @@ class VideoService:
                 raise ValueError("Failed to save video to database")
 
                 # Publish event
-            self.event_bus.publish("video_uploaded", {
+            await self.event_bus.publish("video_uploaded", {
                 "video_id": video_id,
                 "file_path": file_path,
                 "user_id": user_id

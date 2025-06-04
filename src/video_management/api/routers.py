@@ -10,7 +10,6 @@ from src.auth.domain.user import User
 from src.video_management.api.dependencies import get_video_service
 from src.video_management.application.video_service import VideoService
 from .schemas import VideoResponse, VideoDetailResponse
-from ..domain.video import Video
 from ...transcription.api.dependencies import get_transcription_service
 from ...transcription.application.transcription_service import TranscriptionService
 
@@ -83,6 +82,7 @@ async def upload_video(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Upload failed: {str(e)}"
         ) from e
+
 
 @router.get(
     "/",
@@ -207,6 +207,7 @@ async def download_video(
             detail=f"Download failed: {str(e)}"
         ) from e
 
+
 @router.get(path="/{video_id}/transcription",
             responses={
                 404: {"description": "Video not found"},
@@ -214,6 +215,6 @@ async def download_video(
                 410: {"description": "Video file unavailable"}
             })
 async def transcription_video(video_id: UUID,
-        current_user: User = Depends(get_current_user),
-        transcription_service: TranscriptionService = Depends(get_transcription_service)):
+                              current_user: User = Depends(get_current_user),
+                              transcription_service: TranscriptionService = Depends(get_transcription_service)):
     await transcription_service.process_transcription(str(video_id))

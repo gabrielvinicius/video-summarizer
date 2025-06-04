@@ -34,17 +34,17 @@ class EventBus:
             self.subscribers[event_type] = []
         self.subscribers[event_type].append(handler)
 
-    def publish(self, event_type: str, data: Any):
+    async def publish(self, event_type: str, data: Any):
         if event_type in self.subscribers:
             for handler in self.subscribers[event_type]:
                 if asyncio.iscoroutinefunction(handler):
-                    asyncio.create_task(handler(data))  # ✅ dispara a coroutine
+                    await asyncio.create_task(handler(data))  # ✅ dispara a coroutine
                 else:
                     handler(data)
 
         # Serializa para Redis (UUIDs devem ser convertidos para string antes)
         try:
-            redis_client.publish(event_type, json.dumps(data, default=str))  # ✅ default=str para UUIDs
+            await redis_client.publish(event_type, json.dumps(data, default=str))  # ✅ default=str para UUIDs
         except TypeError as e:
             raise ValueError(f"Erro ao serializar payload: {e}")
 
