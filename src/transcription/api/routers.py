@@ -13,3 +13,4 @@ async def get_transcription(transcription_id: str, service: TranscriptionService
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcrição não encontrada")
     return transcription
+

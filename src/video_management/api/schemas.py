@@ -20,8 +20,8 @@ class VideoResponse(BaseModel):
 
 
 class VideoDetailResponse(VideoResponse):
-    transcription: Optional[str] = None
-    summary: Optional[str] = None
+    # transcription: Optional[str] = None
+    # summary: Optional[str] = None
 
     model_config = {
         "from_attributes": True

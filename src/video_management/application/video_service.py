@@ -23,7 +23,7 @@ class VideoService:
     async def upload_video(self, user_id: str, file: bytes, filename: str) -> Video:
         """Uploads a video and triggers processing event"""
         try:
-            video_id = str(uuid4())
+            video_id = uuid4()
             file_path = f"videos/{user_id}/{video_id}/{filename}"
 
             if self.storage_service is None:
@@ -36,7 +36,7 @@ class VideoService:
             # Upload file to storage
             await self.storage_service.upload(file_path, file)
 
-            # Create video entity
+                # Create video entity
             video = Video(
                 id=video_id,
                 user_id=user_id,
@@ -44,13 +44,13 @@ class VideoService:
                 status=VideoStatus.UPLOADED
             )
 
-            # Save to database
+                # Save to database
             saved_video = await self.video_repository.save(video)
             if not saved_video:
                 raise ValueError("Failed to save video to database")
 
-            # Publish event
-            await self.event_bus.publish("video_uploaded", {
+                # Publish event
+            self.event_bus.publish("video_uploaded", {
                 "video_id": video_id,
                 "file_path": file_path,
                 "user_id": user_id

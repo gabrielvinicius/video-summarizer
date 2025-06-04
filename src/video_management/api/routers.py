@@ -11,6 +11,8 @@ from src.video_management.api.dependencies import get_video_service
 from src.video_management.application.video_service import VideoService
 from .schemas import VideoResponse, VideoDetailResponse
 from ..domain.video import Video
+from ...transcription.api.dependencies import get_transcription_service
+from ...transcription.application.transcription_service import TranscriptionService
 
 router = APIRouter(
     prefix="/videos",
@@ -62,7 +64,7 @@ async def upload_video(
                 detail=f"File too large. Max size is {max_size // (1024 * 1024)}MB"
             )
 
-        # Lê o c    onteúdo uma única vez
+        # Lê o conteúdo uma única vez
         video_data = await file.read()
 
         # Passa os dados binários para o service
@@ -147,13 +149,7 @@ async def get_video_details(
             detail="You don't have permission to access this video"
         )
 
-    return jsonable_encoder(VideoDetailResponse(
-        id=video.id,
-        status=video.status.value,
-        created_at=video.created_at,
-        transcription=video.transcription_id,
-        summary=video.summary_id
-    ))
+    return jsonable_encoder(video)
 
 
 @router.get(
@@ -210,3 +206,14 @@ async def download_video(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Download failed: {str(e)}"
         ) from e
+
+@router.get(path="/{video_id}/transcription",
+            responses={
+                404: {"description": "Video not found"},
+                403: {"description": "Access denied"},
+                410: {"description": "Video file unavailable"}
+            })
+async def transcription_video(video_id: UUID,
+        current_user: User = Depends(get_current_user),
+        transcription_service: TranscriptionService = Depends(get_transcription_service)):
+    await transcription_service.process_transcription(str(video_id))
