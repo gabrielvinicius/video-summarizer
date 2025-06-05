@@ -23,19 +23,20 @@ class WhisperTranscriber(ISpeechRecognition):
         path = None
         try:
             path = await self._decode_file_bytes(file)
-            audio = whisper.load_audio(path)
+            # audio = whisper.load_audio(path)
 
             # audio = await self._decode_audio_bytes(file)
 
             # Ensure length compatibility with Whisper
-            audio = whisper.pad_or_trim(audio)
+            # audio = whisper.pad_or_trim(audio)
 
             # Generate mel spectrogram and transcribe
-            mel = whisper.log_mel_spectrogram(audio).to(self.model.device)
-            options = whisper.DecodingOptions(fp16=False)
-            result = whisper.decode(self.model, mel, options)
+            # mel = whisper.log_mel_spectrogram(audio).to(self.model.device)
+            # options = whisper.DecodingOptions(fp16=False)
+            # result = whisper.decode(self.model, mel, options)
+            result = self.model.transcribe(path)
 
-            return result.text
+            return result["text"]
         except Exception as e:
             logger.error(f"Transcription failed: {str(e)}")
             raise RuntimeError(f"Transcription error: {str(e)}")
@@ -77,7 +78,7 @@ class WhisperTranscriber(ISpeechRecognition):
             logger.error(f"Audio decoding from video/audio failed: {str(e)}")
             raise RuntimeError(f"Audio decoding error: {str(e)}")
 
-    async def _decode_file_bytes(self, file_bytes: bytes) -> str:
+    def _decode_file_bytes(self, file_bytes: bytes) -> str:
         tmp = tempfile.NamedTemporaryFile(suffix=".tmp", delete=False)
         tmp.write(file_bytes)
         tmp.flush()
