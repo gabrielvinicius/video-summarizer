@@ -14,7 +14,7 @@ async def register_event_handlers(event_bus: EventBus) -> None:
         event_bus: The event bus instance to register handlers with
     """
 
-    def handle_video_uploaded(event_data: Dict[str, Any]) -> None:
+    async def handle_video_uploaded(event_data: Dict[str, Any]) -> None:
         """
         Handles video_uploaded events by triggering transcription processing.
 
@@ -28,11 +28,10 @@ async def register_event_handlers(event_bus: EventBus) -> None:
             video_id = event_data["video_id"]
             logger.info(f"Received video_uploaded event for video {video_id}")
 
-            # Validate required fields
             if not video_id:
                 raise ValueError("Missing required video_id in event data")
 
-            # Async task dispatch with error handling
+            # Async task dispatch (Celery .delay é sync, mas o handler pode ser async)
             process_transcription_task.delay(video_id)
             logger.info(f"Successfully dispatched transcription task for video {video_id}")
 
@@ -42,8 +41,8 @@ async def register_event_handlers(event_bus: EventBus) -> None:
             logger.error(f"Failed to handle video_uploaded event: {e}", exc_info=True)
             # Consider adding retry logic or dead-letter queue handling here
 
-    # Register the handler with error wrapping
     try:
+        # Suporte tanto para handlers sync quanto async
         event_bus.subscribe("video_uploaded", handle_video_uploaded)
         logger.info("Successfully registered video_uploaded handler")
     except Exception as e:

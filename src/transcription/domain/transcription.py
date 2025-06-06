@@ -1,14 +1,9 @@
 from sqlalchemy import Column, String, DateTime, Enum as SqlEnum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
-# from sqlalchemy.orm import Mapped, relationship
-
 from src.shared.infrastructure.database import Base
 from datetime import datetime
 import enum
 import uuid
-
-# from src.summarization.domain.summary import Summary
-# from src.video_management.domain.video import Video
 
 
 class TranscriptionStatus(str, enum.Enum):
@@ -22,16 +17,11 @@ class Transcription(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id"), nullable=False, unique=True)
-    #video: Mapped["Video"] = relationship(back_populates="transcription")
     text = Column(Text, nullable=True)
     status = Column(SqlEnum(TranscriptionStatus), default=TranscriptionStatus.PROCESSING, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     processed_at = Column(DateTime, nullable=True)
     error_message = Column(String, nullable=True)
-
-    # Uncomment if you want to establish a relationship with Summary
-    # transcription_id: Mapped[UUID] = Column(UUID(as_uuid=True), ForeignKey("transcriptions.id"))
-    #summary: Mapped["Summary"] = relationship(back_populates="transcription")
 
     def mark_as_completed(self, text: str):
         self.text = text
