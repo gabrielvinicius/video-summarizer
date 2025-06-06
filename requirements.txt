@@ -9,12 +9,11 @@ botocore>=1.37.3
 python-dotenv>=1.1.0
 transformers>=4.52.3
 jose~=1.0.0
-python-jose~=3.4.0
-pydantic-settings~=2.9.1
-openai-whisper
 boto3~=1.37.3
 numpy~=2.2.6
 alembic~=1.16.1
 av~=14.4.0
-faster-whisper~=1.1.1
 resampy~=0.4.3
+openai>=1.82.0
+httpx>=1.0.0b0
+uvicorn>=0.34.2

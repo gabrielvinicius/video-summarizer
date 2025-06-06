@@ -28,6 +28,9 @@ class Transcription(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     processed_at = Column(DateTime, nullable=True)
     error_message = Column(String, nullable=True)
+
+    # Uncomment if you want to establish a relationship with Summary
+    # transcription_id: Mapped[UUID] = Column(UUID(as_uuid=True), ForeignKey("transcriptions.id"))
     #summary: Mapped["Summary"] = relationship(back_populates="transcription")
 
     def mark_as_completed(self, text: str):

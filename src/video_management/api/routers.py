@@ -12,6 +12,7 @@ from src.video_management.application.video_service import VideoService
 from .schemas import VideoResponse, VideoDetailResponse
 from ...transcription.api.dependencies import get_transcription_service
 from ...transcription.application.transcription_service import TranscriptionService
+from ...transcription.domain.transcription import Transcription
 
 router = APIRouter(
     prefix="/videos",
@@ -214,7 +215,10 @@ async def download_video(
                 403: {"description": "Access denied"},
                 410: {"description": "Video file unavailable"}
             })
-async def transcription_video(video_id: UUID,
+async def transcription_video(video_id: str,
                               current_user: User = Depends(get_current_user),
                               transcription_service: TranscriptionService = Depends(get_transcription_service)):
-    await transcription_service.process_transcription(str(video_id))
+    transcription: Transcription = await transcription_service.process_transcription(str(video_id))
+    return jsonable_encoder(transcription) if transcription else {
+        "message": "No transcription available for this video"
+    }

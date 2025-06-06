@@ -6,7 +6,7 @@ from src.transcription.tasks.tasks import process_transcription_task
 logger = logging.getLogger(__name__)
 
 
-def register_event_handlers(event_bus: EventBus) -> None:
+async def register_event_handlers(event_bus: EventBus) -> None:
     """
     Registers all transcription-related event handlers with the event bus.
 

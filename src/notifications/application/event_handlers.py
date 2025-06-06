@@ -2,7 +2,8 @@
 from src.shared.events.event_bus import EventBus
 from ..tasks.notification_tasks import send_notification_task
 
-def register_event_handlers(event_bus: EventBus):
+
+async def register_event_handlers(event_bus: EventBus):
     async def handle_summary_generated(event_data: dict):
         user_id = event_data["user_id"]
         video_id = event_data["video_id"]
