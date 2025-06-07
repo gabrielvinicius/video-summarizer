@@ -1,34 +1,48 @@
-from sqlalchemy import select, delete, update, func
+from typing import Optional, Sequence, List, Union
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import Session
+from sqlalchemy import select, delete, update, func
 from src.video_management.domain.video import Video, VideoStatus
-from typing import Optional, Sequence, List
 import logging
 
 logger = logging.getLogger(__name__)
 
-
 class VideoRepository:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: Union[AsyncSession, Session]):
         self.db = db
+
+    def _is_async(self):
+        return isinstance(self.db, AsyncSession)
 
     async def save(self, video: Video) -> Video:
         """Saves a video entity and returns the persisted version."""
         try:
             self.db.add(video)
-            await self.db.commit()
-            await self.db.refresh(video)
+            if self._is_async():
+                await self.db.commit()
+                await self.db.refresh(video)
+            else:
+                self.db.commit()
+                self.db.refresh(video)
             return video
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"Failed to save video {video.id}: {e}")
+            if self._is_async():
+                await self.db.rollback()
+            else:
+                self.db.rollback()
+            logger.error(f"Failed to save video {getattr(video, 'id', None)}: {e}")
             raise
 
-    async def find_by_id(self, video_id: str) -> Optional[Video]:
-        """Finds a video by ID, optionally including user relationship."""
+    async def find_by_id(self, video_id: UUID) -> Optional[Video]:
+        """Finds a video by ID."""
         query = select(Video).where(Video.id == video_id)
-        result = await self.db.execute(query)
-        return result.unique().scalar_one_or_none()
+        if self._is_async():
+            result = await self.db.execute(query)
+            return result.scalar_one_or_none()
+        else:
+            result = self.db.execute(query)
+            return result.scalar_one_or_none()
 
     async def list_all(
         self,
@@ -40,12 +54,16 @@ class VideoRepository:
         query = select(Video).offset(skip).limit(limit)
         if status:
             query = query.where(Video.status == status)
-        result = await self.db.execute(query)
-        return result.scalars().all()
+        if self._is_async():
+            result = await self.db.execute(query)
+            return result.scalars().all()
+        else:
+            result = self.db.execute(query)
+            return result.scalars().all()
 
     async def list_by_user(
         self,
-        user_id: str,
+        user_id: UUID,
         skip: int = 0,
         limit: int = 100,
         status: Optional[VideoStatus] = None
@@ -55,10 +73,14 @@ class VideoRepository:
         if status:
             query = query.where(Video.status == status)
         query = query.offset(skip).limit(limit)
-        result = await self.db.execute(query)
-        return result.scalars().all()
+        if self._is_async():
+            result = await self.db.execute(query)
+            return result.scalars().all()
+        else:
+            result = self.db.execute(query)
+            return result.scalars().all()
 
-    async def update_status(self, video_id: str, status: VideoStatus) -> Optional[Video]:
+    async def update_status(self, video_id: UUID, status: VideoStatus) -> Optional[Video]:
         """Updates video status efficiently and returns the updated video."""
         try:
             stmt = (
@@ -67,60 +89,94 @@ class VideoRepository:
                 .values(status=status)
                 .returning(Video)
             )
-            result = await self.db.execute(stmt)
-            await self.db.commit()
-            return result.scalar_one_or_none()
+            if self._is_async():
+                result = await self.db.execute(stmt)
+                await self.db.commit()
+                return await result.scalar_one_or_none()
+            else:
+                result = self.db.execute(stmt)
+                self.db.commit()
+                return result.scalar_one_or_none()
         except Exception as e:
-            await self.db.rollback()
+            if self._is_async():
+                await self.db.rollback()
+            else:
+                self.db.rollback()
             logger.error(f"Failed to update status for video {video_id}: {e}")
             raise
 
-    async def bulk_update_status(self, video_ids: List[str], status: VideoStatus) -> int:
+    async def bulk_update_status(self, video_ids: List[UUID], status: VideoStatus) -> int:
         """Updates status for multiple videos in a single operation."""
         try:
-            result = await self.db.execute(
+            stmt = (
                 update(Video)
                 .where(Video.id.in_(video_ids))
                 .values(status=status)
             )
-            await self.db.commit()
-            return result.rowcount
+            if self._is_async():
+                result = await self.db.execute(stmt)
+                await self.db.commit()
+                return result.rowcount
+            else:
+                result = self.db.execute(stmt)
+                self.db.commit()
+                return result.rowcount
         except Exception as e:
-            await self.db.rollback()
+            if self._is_async():
+                await self.db.rollback()
+            else:
+                self.db.rollback()
             logger.error(f"Bulk status update failed: {e}")
             raise
 
-    async def delete(self, video_id: str) -> bool:
+    async def delete(self, video_id: UUID) -> bool:
         """Deletes a video and returns whether operation was successful."""
         try:
-            result = await self.db.execute(
-                delete(Video).where(Video.id == video_id)
-            )
-            await self.db.commit()
-            return result.rowcount > 0
+            stmt = delete(Video).where(Video.id == video_id)
+            if self._is_async():
+                result = await self.db.execute(stmt)
+                await self.db.commit()
+                return result.rowcount > 0
+            else:
+                result = self.db.execute(stmt)
+                self.db.commit()
+                return result.rowcount > 0
         except Exception as e:
-            await self.db.rollback()
+            if self._is_async():
+                await self.db.rollback()
+            else:
+                self.db.rollback()
             logger.error(f"Failed to delete video {video_id}: {e}")
             raise
 
-    async def exists(self, video_id: str) -> bool:
+    async def exists(self, video_id: UUID) -> bool:
         """Efficiently checks if a video exists."""
-        result = await self.db.execute(
-            select(select(Video).where(Video.id == video_id).exists())
-        )
-        return result.scalar()
+        stmt = select(select(Video).where(Video.id == video_id).exists())
+        if self._is_async():
+            result = await self.db.execute(stmt)
+            return result.scalar()
+        else:
+            result = self.db.execute(stmt)
+            return result.scalar()
 
-    async def count_by_user(self, user_id: str, status: Optional[VideoStatus] = None) -> int:
+    async def count_by_user(self, user_id: UUID, status: Optional[VideoStatus] = None) -> int:
         """Counts videos for a user, optionally filtered by status."""
         query = select(func.count(Video.id)).where(Video.user_id == user_id)
         if status:
             query = query.where(Video.status == status)
-        result = await self.db.execute(query)
-        return result.scalar_one()  # Always returns an integer
+        if self._is_async():
+            result = await self.db.execute(query)
+            return result.scalar_one()
+        else:
+            result = self.db.execute(query)
+            return result.scalar_one()
 
-    async def get_video_status(self, video_id: str) -> Optional[VideoStatus]:
+    async def get_video_status(self, video_id: UUID) -> Optional[VideoStatus]:
         """Retrieves just the status of a video without loading entire entity."""
-        result = await self.db.execute(
-            select(Video.status).where(Video.id == video_id)
-        )
-        return result.scalar_one_or_none()
+        stmt = select(Video.status).where(Video.id == video_id)
+        if self._is_async():
+            result = await self.db.execute(stmt)
+            return result.scalar_one_or_none()
+        else:
+            result = self.db.execute(stmt)
+            return result.scalar_one_or_none()

@@ -22,8 +22,8 @@ def register_storage(provider: str):
     return decorator
 
 
-def get_storage_service() -> StorageService:
-    load_dotenv()
+async def get_storage_service() -> StorageService:
+    load_dotenv(override=True)
     _load_storage_plugins()  # Lazy-load dos providers
     settings = StorageSettings()
     provider = settings.provider
@@ -47,4 +47,4 @@ def _load_storage_plugins():
         full_module_name = f"{package_name}.{module_name}"
         importlib.import_module(full_module_name)
 
-    _plugins_loaded = True
+    # _plugins_loaded = True

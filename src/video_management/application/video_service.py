@@ -79,14 +79,14 @@ class VideoService:
     async def list_user_videos(self, user_id: str) -> Sequence[Video]:
         return await self.video_repository.list_by_user(user_id)
 
-    async def update_video_status(self, video_id: str, status: VideoStatus) -> Optional[Video]:
+    async def update_video_status(self, video_id: str, status: VideoStatus)-> Optional[Video]:
         """Updates video status and returns updated video"""
         video = await self.video_repository.find_by_id(video_id)
         if not video:
             return None
 
         video.status = status
-        return await self.video_repository.save(video)
+        return await self.video_repository.find_by_id(video.id)
 
     async def delete_video(self, video_id: str) -> bool:
         """Deletes video and its storage files"""

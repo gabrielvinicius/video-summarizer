@@ -4,21 +4,17 @@ from uuid import UUID
 from datetime import datetime
 from enum import Enum
 
-
 class TranscriptionStatus(str, Enum):
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
-
 class TranscriptionBase(BaseModel):
     video_id: UUID
     text: Optional[str] = None
 
-
 class TranscriptionCreate(TranscriptionBase):
     pass
-
 
 class TranscriptionRead(TranscriptionBase):
     id: UUID
@@ -28,8 +24,7 @@ class TranscriptionRead(TranscriptionBase):
     error_message: Optional[str]
 
     class Config:
-        from_attributes = True
-
+        from_attributes = True  # Use orm_mode = True para Pydantic v1
 
 class TranscriptionResponse(TranscriptionRead):
     pass

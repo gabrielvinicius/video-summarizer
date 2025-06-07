@@ -1,3 +1,4 @@
+# src/auth/utils/token.py
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from uuid import UUID
@@ -8,10 +9,10 @@ from src.shared.config.auth_settings import AuthSettings
 settings = AuthSettings()
 
 
-def create_access_token(user: User) -> str:
+def create_access_token(user_id: UUID) -> str:
     expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
     payload = {
-        "sub": str(user.id),
+        "sub": str(user_id),
         "exp": expire
     }
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)

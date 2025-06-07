@@ -9,7 +9,7 @@ settings = DatabaseSettings()
 
 # Sync Engine
 engine_sync = create_engine(
-    url=settings.database_url,
+    url=settings.database_url.replace('+asyncpg', ''),
     echo=True,
     pool_pre_ping=True,
     pool_timeout=30

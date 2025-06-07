@@ -1,8 +1,6 @@
 from datetime import datetime, timedelta
 from uuid import UUID
-
 from passlib.context import CryptContext
-from jose import JWTError, jwt
 from typing import Optional
 from src.auth.domain.user import User, UserRole
 from src.shared.config.auth_settings import AuthSettings
@@ -10,13 +8,8 @@ from src.shared.utils.id_generator import generate_id
 from src.auth.infrastructure.user_repository import UserRepository
 from src.auth.utils.token import create_access_token as token_util_create, verify_token as token_util_verify
 
-# from src.shared.utils.id_generator import generate_id
-
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 settings = AuthSettings()
-
 
 class AuthService:
     def __init__(self, user_repository: UserRepository):
@@ -31,11 +24,12 @@ class AuthService:
             raise ValueError("Email já registrado")
 
         hashed_password = pwd_context.hash(password)
-        user = User(id=generate_id(),
-                    email=email,
-                    password_hash=hashed_password,
-                    role=UserRole.USER
-                    )
+        user = User(
+            id=generate_id(),
+            email=email,
+            password_hash=hashed_password,
+            role=UserRole.USER
+        )
         return await self.user_repository.save(user)
 
     async def authenticate_user(self, email: str, password: str) -> Optional[User]:
@@ -45,7 +39,7 @@ class AuthService:
         return user
 
     def create_access_token(self, user: User) -> str:
-        return token_util_create(user)
+        return token_util_create(user.id)
 
-    def verify_token(self,token: str) -> Optional[User]:
+    def verify_token(self, token: str) -> Optional[User]:
         return token_util_verify(token)

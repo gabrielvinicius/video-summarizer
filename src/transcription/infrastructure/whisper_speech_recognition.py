@@ -78,7 +78,7 @@ class WhisperTranscriber(ISpeechRecognition):
             logger.error(f"Audio decoding from video/audio failed: {str(e)}")
             raise RuntimeError(f"Audio decoding error: {str(e)}")
 
-    def _decode_file_bytes(self, file_bytes: bytes) -> str:
+    async def _decode_file_bytes(self, file_bytes: bytes) -> str:
         tmp = tempfile.NamedTemporaryFile(suffix=".tmp", delete=False)
         tmp.write(file_bytes)
         tmp.flush()

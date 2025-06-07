@@ -12,7 +12,6 @@ from src.video_management.application.video_service import VideoService
 from .schemas import VideoResponse, VideoDetailResponse
 from ...transcription.api.dependencies import get_transcription_service
 from ...transcription.application.transcription_service import TranscriptionService
-from ...transcription.domain.transcription import Transcription
 
 router = APIRouter(
     prefix="/videos",
@@ -20,17 +19,6 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-
-@router.post(
-    "/upload",
-    response_model=VideoResponse,
-    status_code=status.HTTP_201_CREATED,
-    responses={
-        400: {"description": "Invalid file format"},
-        413: {"description": "File too large"},
-        500: {"description": "Upload failed"}
-    }
-)
 @router.post(
     "/upload",
     response_model=VideoResponse,
@@ -42,7 +30,7 @@ router = APIRouter(
     }
 )
 async def upload_video(
-        file: UploadFile = File(...),  # Garanta que o parâmetro é obrigatório
+        file: UploadFile = File(...),
         current_user: User = Depends(get_current_user),
         video_service: VideoService = Depends(get_video_service),
 ):
@@ -54,18 +42,15 @@ async def upload_video(
                 detail="Only MP4, MOV and AVI files are allowed"
             )
 
-        # Verificação do tamanho do arquivo
+        # Lê o conteúdo para verificar o tamanho
+        video_data = await file.read()
         max_size = 100 * 1024 * 1024  # 100MB
-        file_size = file.size  # Use o atributo size diretamente
 
-        if file_size > max_size:
+        if len(video_data) > max_size:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail=f"File too large. Max size is {max_size // (1024 * 1024)}MB"
             )
-
-        # Lê o conteúdo uma única vez
-        video_data = await file.read()
 
         # Passa os dados binários para o service
         video = await video_service.upload_video(
@@ -83,7 +68,6 @@ async def upload_video(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Upload failed: {str(e)}"
         ) from e
-
 
 @router.get(
     "/",
@@ -115,7 +99,6 @@ async def list_videos(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch videos"
         ) from e
-
 
 @router.get(
     "/{video_id}",
@@ -151,7 +134,6 @@ async def get_video_details(
         )
 
     return jsonable_encoder(video)
-
 
 @router.get(
     "/{video_id}/download",
@@ -208,17 +190,16 @@ async def download_video(
             detail=f"Download failed: {str(e)}"
         ) from e
 
-
-@router.get(path="/{video_id}/transcription",
-            responses={
-                404: {"description": "Video not found"},
-                403: {"description": "Access denied"},
-                410: {"description": "Video file unavailable"}
-            })
-async def transcription_video(video_id: str,
-                              current_user: User = Depends(get_current_user),
-                              transcription_service: TranscriptionService = Depends(get_transcription_service)):
-    transcription: Transcription = await transcription_service.process_transcription(str(video_id))
-    return jsonable_encoder(transcription) if transcription else {
-        "message": "No transcription available for this video"
-    }
+@router.get(
+    "/{video_id}/transcription"
+)
+async def transcription_video(
+    video_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Trigger asynchronous transcription for a video.
+    """
+    from src.transcription.tasks.tasks import process_transcription_task
+    process_transcription_task.delay(video_id)
+    return {"message": "Transcription started"}
