@@ -6,7 +6,7 @@ from src.transcription.infrastructure.speech_recognition import ISpeechRecogniti
 from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
 from .transcription_repository import TranscriptionRepository
 from .whisper_speech_recognition import WhisperTranscriber
-from ...shared.infrastructure.database import get_db
+
 
 
 async def get_speech_recognition() -> ISpeechRecognition:
