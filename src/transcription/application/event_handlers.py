@@ -1,3 +1,7 @@
+""" Event handlers for transcription-related events.
+This module registers handlers for events related to video uploads and transcription processing.
+"""
+# src/transcription/application/event_handlers.py
 import logging
 from typing import Dict, Any
 from src.shared.events.event_bus import EventBus
@@ -9,9 +13,6 @@ logger = logging.getLogger(__name__)
 async def register_event_handlers(event_bus: EventBus) -> None:
     """
     Registers all transcription-related event handlers with the event bus.
-
-    Args:
-        event_bus: The event bus instance to register handlers with
     """
 
     async def handle_video_uploaded(event_data: Dict[str, Any]) -> None:
@@ -31,7 +32,7 @@ async def register_event_handlers(event_bus: EventBus) -> None:
             if not video_id:
                 raise ValueError("Missing required video_id in event data")
 
-            # Async task dispatch (Celery .delay é sync, mas o handler pode ser async)
+            # Dispatch transcription task asynchronously (via Celery)
             process_transcription_task.delay(video_id)
             logger.info(f"Successfully dispatched transcription task for video {video_id}")
 
@@ -39,10 +40,8 @@ async def register_event_handlers(event_bus: EventBus) -> None:
             logger.error(f"Missing required field in event data: {e}")
         except Exception as e:
             logger.error(f"Failed to handle video_uploaded event: {e}", exc_info=True)
-            # Consider adding retry logic or dead-letter queue handling here
 
     try:
-        # Suporte tanto para handlers sync quanto async
         event_bus.subscribe("video_uploaded", handle_video_uploaded)
         logger.info("Successfully registered video_uploaded handler")
     except Exception as e:

@@ -9,6 +9,7 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+
 class TranscriptionRepository:
     def __init__(self, db: Union[Session, AsyncSession]):
         self.db = db
@@ -17,7 +18,8 @@ class TranscriptionRepository:
         return isinstance(self.db, AsyncSession)
 
     async def find_by_id(self, transcription_id: Union[str, UUID]) -> Optional[Transcription]:
-        stmt = select(Transcription).where(Transcription.id == str(transcription_id)).execution_options(populate_existing=True)
+        stmt = select(Transcription).where(Transcription.id == str(transcription_id)).execution_options(
+            populate_existing=True)
         if self._is_async():
             result = await self.db.execute(stmt)
             return result.scalar_one_or_none()

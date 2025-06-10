@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from functools import cached_property
 
+
 class DatabaseSettings(BaseSettings):
     db_scheme: str = "postgresql"
     db_user: str

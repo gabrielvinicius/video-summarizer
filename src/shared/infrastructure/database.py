@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, NullPool
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from typing import AsyncGenerator, Generator
@@ -19,9 +19,7 @@ engine_sync = create_engine(
 engine = create_async_engine(
     settings.database_url,
     echo=True,
-    pool_pre_ping=True,
-    pool_recycle=1800,
-    pool_timeout=30,
+    poolclass=NullPool,
 )
 
 # Session factories

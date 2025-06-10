@@ -12,7 +12,8 @@ from ...shared.infrastructure.database import get_db
 async def get_speech_recognition() -> ISpeechRecognition:
     return WhisperTranscriber()
 
-async def get_transcription_repository() -> TranscriptionRepository | None:
-    async for db in get_db():
+
+async def get_transcription_repository(db: AsyncSession) -> TranscriptionRepository | None:
+    if db:
         return TranscriptionRepository(db)
     return None
