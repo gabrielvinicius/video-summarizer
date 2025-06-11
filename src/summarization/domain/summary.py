@@ -38,3 +38,9 @@ class Summary(Base):
         self.status = SummaryStatus.FAILED
         self.error_message = error
         self.processed_at = datetime.utcnow()
+
+    def mark_as_processing(self):
+        self.status = SummaryStatus.PROCESSING
+        self.processed_at = datetime.utcnow()
+        self.error_message = None
+        self.text = None

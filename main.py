@@ -13,34 +13,69 @@ from src.transcription.application.event_handlers import register_event_handlers
 from src.summarization.application.event_handlers import register_event_handlers as register_summary_handlers
 from src.notifications.application.event_handlers import register_event_handlers as register_notification_handlers
 
-event_bus = get_event_bus()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup logic
+    # Inicialização do banco de dados
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Configuração do barramento de eventos
+    event_bus = get_event_bus()
+
+    # Registro dos handlers de eventos
     await register_transcription_handlers(event_bus)
     await register_summary_handlers(event_bus)
     await register_notification_handlers(event_bus)
-    event_bus.start_listener()  # Use await se for async!
-    yield
-    # Shutdown logic (opcional)
-    # await event_bus.stop_listener()  # Se você tiver esse método
+
+    # Inicia o listener do event bus
+    await event_bus.start_listener()
+
+    # Disponibiliza o event_bus no estado da aplicação
+    app.state.event_bus = event_bus
+
+    try:
+        yield
+    finally:
+        # Encerramento limpo
+        if hasattr(event_bus, "stop_listener"):
+            await event_bus.stop_listener()
+        await engine.dispose()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="API de Gerenciamento de Vídeos",
+    description="API para upload, transcrição e sumarização de vídeos",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
-# Registra rotas
-app.include_router(auth_router)
-app.include_router(video_router)
-app.include_router(transcription_router)
-app.include_router(summary_router)
-app.include_router(notification_router)
+# Registra rotas com prefixos e tags organizadas
+app.include_router(auth_router, prefix="/auth", tags=["Autenticação"])
+app.include_router(video_router, prefix="/videos", tags=["Vídeos"])
+app.include_router(
+    transcription_router,
+    prefix="/transcriptions",
+    tags=["Transcrições"]
+)
+app.include_router(
+    summary_router,
+    prefix="/summaries",
+    tags=["Sumarizações"]
+)
+app.include_router(
+    notification_router,
+    prefix="/notifications",
+    tags=["Notificações"]
+)
 
 if __name__ == "__main__":
     import uvicorn
 
-    # asyncio.run(engine.begin().__aenter__())  # Garante que crie tabelas se rodar direto este script
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        workers=4  # Aumenta o número de workers para produção
+    )

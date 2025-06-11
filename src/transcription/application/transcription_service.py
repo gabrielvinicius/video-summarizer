@@ -122,3 +122,6 @@ class TranscriptionService:
 
     async def get_transcription_by_video(self, video_id: str) -> Transcription:
         return await self.transcription_repo.find_by_video_id(video_id)
+
+    async def get_transcription_by_id(self, transcription_id: str) -> Transcription:
+        return await self.transcription_repo.find_by_id(transcription_id)

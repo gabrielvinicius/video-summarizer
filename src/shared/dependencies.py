@@ -1,3 +1,5 @@
+# src/shared/dependencies.py
+
 from typing import Generator
 
 from fastapi import Depends

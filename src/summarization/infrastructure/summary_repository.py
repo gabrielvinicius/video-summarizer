@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from src.summarization.domain.summary import Summary
 
+
 class SummaryRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -16,5 +17,10 @@ class SummaryRepository:
 
     async def find_by_transcription_id(self, transcription_id: str) -> Optional[Summary]:
         stmt = select(Summary).where(Summary.transcription_id == transcription_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def find_by_id(self, summary_id: str) -> Optional[Summary]:
+        stmt = select(Summary).where(Summary.id == summary_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()

@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from src.summarization.application.summary_service import SummaryService
+from src.summarization.application.summarization_service import SummaryService
 
 
 @pytest.mark.asyncio

@@ -13,14 +13,14 @@ from src.video_management.application.video_service import VideoService
 
 
 async def get_transcription_service(db: AsyncSession,
-        event_bus: EventBus = get_event_bus(),
-        storage_service: StorageService = get_storage_service(),
-        speech_recognition: ISpeechRecognition = get_speech_recognition()
-) -> TranscriptionService:
+                                    event_bus: EventBus = get_event_bus(),
+                                    storage_service: StorageService = get_storage_service(),
+                                    speech_recognition: ISpeechRecognition = get_speech_recognition()
+                                    ) -> TranscriptionService:
     return TranscriptionService(
         event_bus=event_bus,
         transcription_repository=await get_transcription_repository(db),
-        video_service= await get_video_service(db),
+        video_service=await get_video_service(db),
         storage_service=storage_service,
         speech_recognition=speech_recognition
     )

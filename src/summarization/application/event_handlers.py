@@ -7,7 +7,8 @@ from src.summarization.tasks.tasks import process_summary_task
 
 logger = logging.getLogger(__name__)
 
-def register_event_handlers(event_bus: EventBus, summarization_service, transcription_repo):
+
+async def register_event_handlers(event_bus: EventBus):
     async def handle_transcription_completed(event_data: Dict[str, Any]):
         try:
             transcription_id = event_data["transcription_id"]

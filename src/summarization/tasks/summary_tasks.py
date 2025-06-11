@@ -1,5 +1,5 @@
 from celery import shared_task
-from ..application.summary_service import SummaryService
+from ..application.summarization_service import SummaryService
 from src.shared.events.event_bus import EventBus
 from ..infrastructure.huggingface_adapter import HuggingFaceSummarizer
 

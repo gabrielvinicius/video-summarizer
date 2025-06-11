@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Union, Optional
 import asyncio
 
+
 @register_storage("local")
 class LocalStorageService(StorageService):
     def __init__(self):
