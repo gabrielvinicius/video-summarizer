@@ -202,4 +202,5 @@ async def transcription_video(
     """
     from src.transcription.tasks.tasks import process_transcription_task
     process_transcription_task.delay(video_id)
+    # service.process_transcription(str(video_id))
     return {"message": "Transcription started"}

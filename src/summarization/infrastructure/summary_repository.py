@@ -1,28 +1,20 @@
+# src/summarization/infrastructure/summary_repository.py
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
+from sqlalchemy.future import select
 from src.summarization.domain.summary import Summary
 
-
 class SummaryRepository:
-    def __init__(self, db: AsyncSession):
-        self.db = db
+    def __init__(self, session: AsyncSession):
+        self.session = session
 
-    def find_by_id(self, summary_id: str) -> Summary | None:
-        return self.db.query(Summary).filter(Summary.id == summary_id).first()
-
-    def save(self, summary: Summary) -> Summary:
-        self.db.add(summary)
-        self.db.commit()
-        self.db.refresh(summary)
+    async def save(self, summary: Summary) -> Summary:
+        self.session.add(summary)
+        await self.session.commit()
+        await self.session.refresh(summary)
         return summary
 
-    def list_by_user(self, user_id: str) -> list[Summary]:
-        return self.db.query(Summary).filter(Summary.user_id == user_id).all()
-
-    def delete(self, summary_id: str) -> bool:
-        summary = self.find_by_id(summary_id)
-        if summary:
-            self.db.delete(summary)
-            self.db.commit()
-            return True
-        return False
+    async def find_by_transcription_id(self, transcription_id: str) -> Optional[Summary]:
+        stmt = select(Summary).where(Summary.transcription_id == transcription_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

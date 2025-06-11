@@ -1,3 +1,5 @@
+# src/summarization/domain/summary.py
+
 from sqlalchemy import Column, String, DateTime, Enum as SqlEnum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 # from sqlalchemy.orm import Mapped, relationship
@@ -6,8 +8,6 @@ from src.shared.infrastructure.database import Base
 from datetime import datetime
 import enum
 import uuid
-
-# from src.transcription.domain.transcription import Transcription
 
 
 class SummaryStatus(str, enum.Enum):
@@ -30,7 +30,7 @@ class Summary(Base):
     error_message = Column(String, nullable=True)
 
     def mark_as_completed(self, content: str):
-        self.content = content
+        self.text = content
         self.status = SummaryStatus.COMPLETED
         self.processed_at = datetime.utcnow()
 

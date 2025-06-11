@@ -1,63 +1,29 @@
-from typing import Optional
-from ..domain.summary import Summary, SummaryStatus
-from src.transcription.domain.transcription import TranscriptionStatus
-from src.shared.events.event_bus import EventBus
-from src.video_management.domain.video import VideoStatus
-from src.video_management.infrastructure.video_repository import VideoRepository
+# src/summarization/application/summarization_service.py
+import logging
+from src.summarization.domain.summary import Summary, SummaryStatus
 from src.summarization.infrastructure.summary_repository import SummaryRepository
-from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
+from src.summarization.infrastructure.summarizer_interface import ISummarizer
+from datetime import datetime
 
-class SummaryService:
-    def __init__(
-            self,
-            llm_adapter,  # Adaptador para OpenAI/HuggingFace
-            event_bus: EventBus,
-            summary_repository : SummaryRepository,
-            transcription_repository : TranscriptionRepository,
-            video_repository : VideoRepository
-    ):
-        self.llm_adapter = llm_adapter
-        self.event_bus = event_bus
-        self.summary_repo = summary_repository
-        self.transcription_repo = transcription_repository
-        self.video_repo = video_repository
+logger = logging.getLogger(__name__)
 
-    async def generate_summary(self, transcription_id: str) -> Summary:
-        """Gera um resumo a partir de uma transcrição."""
+class SummarizationService:
+    def __init__(self, summarizer: ISummarizer, repo: SummaryRepository):
+        self.summarizer = summarizer
+        self.repo = repo
+
+    async def summarize_transcription(self, transcription_id: str, transcription_text: str) -> Summary:
+        summary = Summary(
+            transcription_id=transcription_id,
+            status=SummaryStatus.PROCESSING
+        )
+        await self.repo.save(summary)
+
         try:
-            # 1. Busca a transcrição
-            transcription = self.transcription_repo.find_by_id(transcription_id)
-            if not transcription or transcription.status != TranscriptionStatus.COMPLETED:
-                raise ValueError("Transcrição inválida ou não processada")
-
-            # 2. Cria a entidade Summary
-            summary = Summary(
-                id=None,
-                transcription_id=transcription_id,
-                video_id=transcription.video_id
-            )
-            self.summary_repo.save(summary)
-
-            # 3. Gera o resumo usando LLM
-            summary_text = await self.llm_adapter.generate_summary(transcription.text)
-
-            # 4. Atualiza o resumo e o vídeo
-            summary.mark_as_completed(summary_text)
-            self.summary_repo.save(summary)
-
-            video = self.video_repo.find_by_id(summary.video_id)
-            video.summary_id = summary.id
-            self.video_repo.save(video)
-
-            # 5. Dispara evento de conclusão
-            await self.event_bus.publish("summary_generated", {
-                "video_id": summary.video_id,
-                "summary_id": summary.id
-            })
-
-            return summary
-
+            result = await self.summarizer.summarize(transcription_text)
+            summary.mark_as_completed(result)
         except Exception as e:
+            logger.error(f"Summarization failed: {e}", exc_info=True)
             summary.mark_as_failed(str(e))
-            self.summary_repo.save(summary)
-            raise
+
+        return await self.repo.save(summary)
