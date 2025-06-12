@@ -72,23 +72,21 @@ def get_service(service_name: str):
 
 
 # Registra rotas com prefixos e tags organizadas
-app.include_router(auth_router, prefix="/auth", tags=["Autenticação"])
-app.include_router(video_router, prefix="/videos", tags=["Vídeos"])
 app.include_router(
     transcription_router,
-    prefix="/transcriptions",
+    #prefix="/transcriptions",
     tags=["Transcrições"],
     dependencies=[Depends(get_service("transcription_service"))]
 )
 app.include_router(
     summary_router,
-    prefix="/summaries",
+    #prefix="/summaries",
     tags=["Sumarizações"],
     dependencies=[Depends(get_service("summarization_service"))]
 )
 app.include_router(
     notification_router,
-    prefix="/notifications",
+    #prefix="/notifications",
     tags=["Notificações"],
     dependencies=[Depends(get_service("event_bus"))]
 )

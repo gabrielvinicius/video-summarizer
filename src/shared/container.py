@@ -38,13 +38,13 @@ class ApplicationContainer:
         self._setup_auth_services(db_session)
 
         # Configuração de vídeo
-        self._setup_video_services(db_session)
+        await self._setup_video_services(db_session)
 
         # Configuração de transcrição
         await self._setup_transcription_services(db_session)
 
         # Configuração de sumarização
-        self._setup_summarization_services(db_session)
+        await self._setup_summarization_services(db_session)
 
         # Registro de event handlers
         await self._register_event_handlers()

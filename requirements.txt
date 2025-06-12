@@ -15,5 +15,15 @@ alembic~=1.16.1
 av~=14.4.0
 resampy~=0.4.3
 openai>=1.82.0
-httpx>=1.0.0b0
+httpx
 uvicorn>=0.34.2
+pydantic_settings
+psycopg2
+asyncpg
+python-jose
+openai-whisper
+intel-extension-for-pytorch==2.7.10+xpu
+pydantic[email]
+python-multipart
+hf_xet
+bcrypt

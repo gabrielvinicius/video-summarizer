@@ -42,7 +42,7 @@ async def upload_video(
 
         # Lê o conteúdo para verificar o tamanho
         video_data = await file.read()
-        max_size = 100 * 1024 * 1024  # 100MB
+        max_size = 200 * 1024 * 1024  # 100MB
 
         if len(video_data) > max_size:
             raise HTTPException(
@@ -193,11 +193,13 @@ async def download_video(
 )
 async def transcription_video(
     video_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    video_service: VideoService = Depends(get_video_service),
 ):
     """
     Trigger asynchronous transcription for a video.
     """
+    video = await video_service.get_video_by_id(video_id)
     from src.transcription.tasks.tasks import process_transcription_task
     process_transcription_task.delay(video_id)
     # service.process_transcription(str(video_id))

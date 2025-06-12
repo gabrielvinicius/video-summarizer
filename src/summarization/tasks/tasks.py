@@ -12,8 +12,8 @@ def process_summary_task(transcription_id: str):
     """
     async def run():
         async with AsyncSessionLocal() as session:
-            container = build_container(session)
-            summarization_service = await container["summarization_service"]
+            container = await build_container(session)
+            summarization_service = container["summarization_service"]
             await summarization_service.process_summary(transcription_id)
 
     asyncio.run(run())
