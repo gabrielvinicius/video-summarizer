@@ -1,4 +1,4 @@
-from uuid import uuid4
+from uuid import uuid4, UUID
 from typing import Optional, Sequence
 from src.video_management.domain.video import Video, VideoStatus
 from src.storage.application.storage_service import StorageService
@@ -73,15 +73,18 @@ class VideoService:
     async def get_video_by_id(self, video_id: str) -> Optional[Video]:
         return await self.video_repository.find_by_id(video_id)
 
+    async def get_video_by_user_by_id(self, video_id: str, user_id: str) -> Optional[Video]:
+        return await self.video_repository.find_by_id_by_user(video_id=UUID(video_id), user_id=UUID(user_id))
+
     async def list_all_videos(self, skip: int = 0, limit: int = 100) -> Sequence[Video]:
         return await self.video_repository.list_all(skip, limit)
 
-    async def list_user_videos(self, user_id: str) -> Sequence[Video]:
-        return await self.video_repository.list_by_user(user_id)
+    async def list_user_videos(self, user_id: str, skip=0, limit=100) -> Sequence[Video]:
+        return await self.video_repository.list_by_user(UUID(user_id))
 
     async def update_video_status(self, video_id: str, status: VideoStatus)-> Optional[Video]:
         """Updates video status and returns updated video"""
-        video = await self.video_repository.find_by_id(video_id)
+        video = await self.video_repository.find_by_id(UUID(video_id))
         if not video:
             return None
 
@@ -90,7 +93,7 @@ class VideoService:
 
     async def delete_video(self, video_id: str) -> bool:
         """Deletes video and its storage files"""
-        video = await self.video_repository.find_by_id(video_id)
+        video = await self.video_repository.find_by_id(UUID(video_id))
         if not video:
             return False
 
@@ -102,7 +105,7 @@ class VideoService:
             # Continue with database deletion even if storage fails
 
         # Delete from database
-        return await self.video_repository.delete(video_id)
+        return await self.video_repository.delete(UUID(video_id))
 
     async def get_video_streaming_url(self, video_id: str) -> Optional[str]:
         """Generates streaming URL for processed videos"""

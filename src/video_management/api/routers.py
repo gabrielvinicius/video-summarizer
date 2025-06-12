@@ -1,4 +1,5 @@
 import io
+import os
 from typing import List
 from uuid import UUID
 from fastapi import APIRouter, UploadFile, Depends, HTTPException, status, File
@@ -10,12 +11,19 @@ from src.auth.domain.user import User
 from src.video_management.api.dependencies import get_video_service
 from src.video_management.application.video_service import VideoService
 from .schemas import VideoResponse, VideoDetailResponse
+from src.transcription.tasks.tasks import process_transcription_task
+from ..domain.video import Video, VideoStatus
 
 router = APIRouter(
     prefix="/videos",
     tags=["videos"],
     responses={404: {"description": "Not found"}},
 )
+
+# Tipos de arquivo permitidos
+ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
+MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB
+
 
 @router.post(
     "/upload",
@@ -32,28 +40,34 @@ async def upload_video(
         current_user: User = Depends(get_current_user),
         video_service: VideoService = Depends(get_video_service),
 ):
+    """
+    Upload a video file
+
+    - **file**: Video file to upload (MP4, MOV, AVI, MKV, WEBM)
+    - Returns: Uploaded video metadata
+    """
     try:
         # Validação do tipo de arquivo
-        if not file.filename or not file.filename.lower().endswith(('.mp4', '.mov', '.avi')):
+        file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ''
+        if file_ext not in ALLOWED_EXTENSIONS:
+            allowed = ", ".join(ALLOWED_EXTENSIONS)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only MP4, MOV and AVI files are allowed"
+                detail=f"Invalid file format. Allowed formats: {allowed}"
             )
 
-        # Lê o conteúdo para verificar o tamanho
-        video_data = await file.read()
-        max_size = 200 * 1024 * 1024  # 100MB
-
-        if len(video_data) > max_size:
+        # Verificar tamanho do arquivo
+        if file.size > MAX_FILE_SIZE:
+            max_size_mb = MAX_FILE_SIZE // (1024 * 1024)
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"File too large. Max size is {max_size // (1024 * 1024)}MB"
+                detail=f"File too large. Max size is {max_size_mb}MB"
             )
 
-        # Passa os dados binários para o service
+        # Processar upload
         video = await video_service.upload_video(
             user_id=str(current_user.id),
-            file=video_data,
+            file=await file.read(),
             filename=file.filename
         )
 
@@ -67,6 +81,7 @@ async def upload_video(
             detail=f"Upload failed: {str(e)}"
         ) from e
 
+
 @router.get(
     "/",
     response_model=List[VideoResponse],
@@ -79,24 +94,25 @@ async def list_videos(
         video_service: VideoService = Depends(get_video_service),
 ):
     """
-    List videos
+    List videos for the current user
 
     - **skip**: Pagination offset
     - **limit**: Max items per page (default 100)
     - Returns: List of video metadata
     """
     try:
-        if current_user.role.value == "admin":
-            videos = await video_service.list_all_videos(skip, limit)
-        else:
-            videos = await video_service.list_user_videos(str(current_user.id))
-
+        videos = await video_service.list_user_videos(
+            user_id=str(current_user.id),
+            skip=skip,
+            limit=limit
+        )
         return jsonable_encoder(videos)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch videos"
         ) from e
+
 
 @router.get(
     "/{video_id}",
@@ -117,21 +133,25 @@ async def get_video_details(
     - **video_id**: UUID of the video
     - Returns: Detailed video metadata
     """
-    video = await video_service.get_video_by_id(str(video_id))
-    if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Video not found"
-        )
+    try:
+        if current_user.role.value == "admin":
+            # Admin can access any video
+            video = await video_service.get_video_by_id(video_id=str(video_id))
+            return jsonable_encoder(video)
 
-    # Verify ownership (unless admin)
-    if current_user.role.value != "admin" and str(video.user_id) != str(current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to access this video"
+        video = await video_service.get_video_by_user_by_id(
+            video_id=str(video_id),
+            user_id=str(current_user.id),
         )
+        return jsonable_encoder(video)
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get video details"
+        ) from e
 
-    return jsonable_encoder(video)
 
 @router.get(
     "/{video_id}/download",
@@ -152,22 +172,27 @@ async def download_video(
     - **video_id**: UUID of the video
     - Returns: Video file stream
     """
-    video = await video_service.get_video_by_id(str(video_id))
-    if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Video not found"
-        )
-
-    # Verify ownership (unless admin)
-    if current_user.role.value != "admin" and str(video.user_id) != str(current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to access this video"
-        )
-
     try:
-        content = await video_service.storage_service.download(video.file_path)
+        video: Video
+
+        video = await video_service.get_video_by_user_by_id(
+            video_id=str(video_id),
+            user_id=str(current_user.id),
+        )
+
+        if current_user.role.value == "admin":
+            # Admin can access any video
+            video = await video_service.get_video_by_id(video_id=str(video_id))
+
+        if not video:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Video not found"
+            )
+
+        # Baixar o conteúdo
+        content, filename = await video_service.storage_service.download(video.file_path)
+
         if content is None:
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,
@@ -178,29 +203,74 @@ async def download_video(
             io.BytesIO(content),
             media_type="video/mp4",
             headers={
-                "Content-Disposition": f'attachment; filename="{video.file_path.split("/")[-1]}"',
+                "Content-Disposition": f'attachment; filename="{filename}"',
                 "Content-Length": str(len(content))
             }
         )
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Download failed: {str(e)}"
         ) from e
 
-@router.get(
-    "/{video_id}/transcription"
+
+@router.post(
+    "/{video_id}/transcription",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        202: {"description": "Transcription started"},
+        404: {"description": "Video not found"},
+        403: {"description": "Access denied"},
+        409: {"description": "Transcription already in progress"}
+    }
 )
-async def transcription_video(
-    video_id: str,
-    current_user: User = Depends(get_current_user),
-    video_service: VideoService = Depends(get_video_service),
+async def start_transcription(
+        video_id: UUID,
+        current_user: User = Depends(get_current_user),
+        video_service: VideoService = Depends(get_video_service),
 ):
     """
-    Trigger asynchronous transcription for a video.
+    Start asynchronous transcription for a video
+
+    - **video_id**: UUID of the video to transcribe
+    - Returns: Confirmation message
     """
-    video = await video_service.get_video_by_id(video_id)
-    from src.transcription.tasks.tasks import process_transcription_task
-    process_transcription_task.delay(video_id)
-    # service.process_transcription(str(video_id))
-    return {"message": "Transcription started"}
+    try:
+        # Verificar permissões e estado do vídeo
+        video = await video_service.get_video_by_user_by_id(
+            video_id=str(video_id),
+            user_id=str(current_user.id),
+            # is_admin=(current_user.role.value == "admin")
+        )
+
+        if current_user.role.value == "admin":
+            # Admin can access any video
+            video = await video_service.get_video_by_id(video_id=str(video_id))
+
+        # Verificar se a transcrição já está em andamento
+        if video.status == VideoStatus.PROCESSING.value:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Transcription is already in progress"
+            )
+
+        # Publish event
+        await video_service.event_bus.publish("video_uploaded", {
+            "video_id": video.id,
+            "file_path": video.file_path,
+            "user_id": video.user_id
+        })
+        # Disparar tarefa de transcrição
+        # process_transcription_task.delay(str(video_id))
+
+        return {"message": "Transcription started successfully"}
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start transcription: {str(e)}"
+        ) from e

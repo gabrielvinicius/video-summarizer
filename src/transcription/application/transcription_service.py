@@ -36,6 +36,10 @@ class TranscriptionService:
             # Verifica se já existe transcrição
             transcription = await self._get_existing_transcription(video_id)
             if transcription and transcription.text and transcription.status == TranscriptionStatus.COMPLETED:
+                await self._publish_event("transcription_completed", {
+                    "video_id": transcription.video_id,
+                    "transcription_id": transcription.id
+                })
                 return transcription
 
             if transcription is None:

@@ -44,6 +44,16 @@ class VideoRepository:
             result = self.db.execute(query)
             return result.scalar_one_or_none()
 
+    async def find_by_id_by_user(self, video_id: UUID, user_id: UUID) -> Optional[Video]:
+        """Finds a video by ID."""
+        query = select(Video).where(Video.id == video_id).where(Video.user_id == user_id)
+        if self._is_async():
+            result = await self.db.execute(query)
+            return result.scalar_one_or_none()
+        else:
+            result = self.db.execute(query)
+            return result.scalar_one_or_none()
+
     async def list_all(
         self,
         skip: int = 0,

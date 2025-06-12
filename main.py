@@ -35,10 +35,10 @@ async def lifespan(app: FastAPI):
         app.state.container = container
 
         # Registra event handlers
-        #print("🔔 Registrando handlers de eventos...")
-        #await register_transcription_handlers(container["event_bus"])
-        #await register_summary_handlers(container["event_bus"])
-        #await register_notification_handlers(container["event_bus"])
+        # print("🔔 Registrando handlers de eventos...")
+        # await register_transcription_handlers(container["event_bus"])
+        # await register_summary_handlers(container["event_bus"])
+        # await register_notification_handlers(container["event_bus"])
 
         # Inicia o event bus
         print("🚀 Iniciando barramento de eventos...")
@@ -102,6 +102,7 @@ app.include_router(
     tags=["Videos"],
     dependencies=[Depends(get_service("event_bus"))]
 )
+
 
 # Rota de saúde da aplicação
 @app.get("/health", tags=["Sistema"])
