@@ -1,35 +1,30 @@
-# src/shared/dependencies.py
-
-from typing import Generator
-
-from fastapi import Depends
+from fastapi import Request, Depends
+from typing import Annotated, Any, AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.orm import Session
-# from src.shared.infrastructure.database import AsyncSessionLocal
-from src.auth.infrastructure.user_repository import UserRepository
-from src.storage.application.storage_service import StorageService
-from src.video_management.infrastructure.video_repository import VideoRepository
-from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
-from src.summarization.infrastructure.summary_repository import SummaryRepository
-from src.notifications.infrastructure.notification_repository import NotificationRepository
-from src.shared.infrastructure.database import get_db
+
+from src.shared.container import ApplicationContainer
+from src.shared.infrastructure.database import AsyncSessionLocal
 
 
-async def get_user_repository(db: AsyncSession = Depends(get_db)) -> UserRepository:
-    return UserRepository(db)
+async def get_db_session() -> AsyncGenerator[Any, Any]:
+    async with AsyncSessionLocal as session:
+        yield session
 
 
-async def get_video_repository(db: AsyncSession = Depends(get_db)) -> VideoRepository:
-    return VideoRepository(db)
+async def get_container(request: Request) -> ApplicationContainer:
+    return request.app.state.container
 
 
-async def get_transcription_repository(db: AsyncSession = Depends(get_db)) -> TranscriptionRepository:
-    return TranscriptionRepository(db)
+def get_service(service_name: str):
+    async def _get_service(
+            container: Annotated[ApplicationContainer, Depends(get_container)]
+    ):
+        return container[service_name]
+
+    return _get_service
 
 
-async def get_summary_repository(db: AsyncSession = Depends(get_db)) -> SummaryRepository:
-    return SummaryRepository(db)
+# Dependências específicas para injeção em rotas
 
-
-async def get_notification_repository(db: AsyncSession = Depends(get_db)) -> NotificationRepository:
-    return NotificationRepository(db)
+get_summarization_service = get_service("summarization_service")
+get_auth_service = get_service("auth_service")

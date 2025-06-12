@@ -1,6 +1,4 @@
-# src/auth/api/dependencies.py
 from uuid import UUID
-
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from typing import Annotated
@@ -10,29 +8,46 @@ from src.auth.domain.user import User, UserRole
 from src.auth.utils.token import verify_token
 from src.auth.infrastructure.user_repository import UserRepository
 from src.auth.application.auth_service import AuthService
-from src.shared.dependencies import get_user_repository
+from src.shared.dependencies import get_auth_service
 
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
-
-
-def get_auth_service(user_repository: UserRepository = Depends(get_user_repository)) -> AuthService:
-    return AuthService(user_repository=user_repository)
+# OAuth2 scheme - corrigido para usar a URL completa
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 async def get_current_user(
         token: Annotated[str, Depends(oauth2_scheme)],
-        user_repo: UserRepository = Depends(get_user_repository)
+        auth_service: AuthService = Depends(get_auth_service)
 ) -> User:
-    payload = verify_token(token)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Token inválido")
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
-    user = await user_repo.find_by_id(UUID(payload["sub"]))
-    if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="Usuário inativo ou inexistente")
+    try:
+        payload = verify_token(token)
+        if not payload:
+            raise credentials_exception
 
-    return user
+        user_id = payload.get("sub")
+        if not user_id:
+            raise credentials_exception
+
+        # Validação adicional do formato UUID
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise credentials_exception
+
+        user = await auth_service.get_user_by_id(str(user_uuid))
+
+        if not user or not user.is_active:
+            raise credentials_exception
+
+        return user
+
+    except JWTError as e:
+        raise credentials_exception from e
 
 
 async def get_current_admin_user(
@@ -44,4 +59,11 @@ async def get_current_admin_user(
             detail="Acesso restrito a administradores",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    return current_user
+
+
+# Nova dependência para usuários comuns (não-admin)
+async def get_current_active_user(
+        current_user: User = Depends(get_current_user),
+) -> User:
     return current_user

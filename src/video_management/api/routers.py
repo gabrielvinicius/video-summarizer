@@ -10,8 +10,6 @@ from src.auth.domain.user import User
 from src.video_management.api.dependencies import get_video_service
 from src.video_management.application.video_service import VideoService
 from .schemas import VideoResponse, VideoDetailResponse
-from ...transcription.api.dependencies import get_transcription_service
-from ...transcription.application.transcription_service import TranscriptionService
 
 router = APIRouter(
     prefix="/videos",

@@ -43,3 +43,6 @@ class AuthService:
 
     def verify_token(self, token: str) -> Optional[User]:
         return token_util_verify(token)
+
+    async def get_user_by_id(self, user_uuid : str) -> User:
+        return await self.user_repository.find_by_id(UUID(user_uuid))
