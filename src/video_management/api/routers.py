@@ -1,5 +1,7 @@
 import io
 import os
+import asyncio
+import json
 from typing import List
 from uuid import UUID
 from fastapi import APIRouter, UploadFile, Depends, HTTPException, status, File
@@ -11,7 +13,7 @@ from src.auth.domain.user import User
 from src.video_management.api.dependencies import get_video_service
 from src.video_management.application.video_service import VideoService
 from .schemas import VideoResponse, VideoDetailResponse
-from src.transcription.tasks.tasks import process_transcription_task
+# from src.transcription.tasks.tasks import process_transcription_task
 from ..domain.video import Video, VideoStatus
 
 router = APIRouter(
@@ -274,3 +276,28 @@ async def start_transcription(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to start transcription: {str(e)}"
         ) from e
+
+@router.get("/events")
+async def video_events(
+    current_user: User = Depends(get_current_user),
+    video_service: VideoService = Depends(get_video_service),
+):
+    """
+    SSE endpoint para atualizações em tempo real do status dos vídeos.
+    """
+    async def event_generator():
+        # Envia o estado inicial de todos os vídeos do usuário
+        videos = await video_service.list_user_videos(user_id=str(current_user.id))
+        for video in videos:
+            yield f"data: {json.dumps({'type': 'INITIAL', 'video': video.model_dump()})}\n\n"
+
+        # Mantém a conexão aberta e envia atualizações conforme os eventos acontecem
+        # Em um sistema real, você escutaria um canal Redis para eventos `video_status_changed`.
+        # Para demonstração, faremos polling a cada 5 segundos.
+        while True:
+            await asyncio.sleep(5)
+            updated_videos = await video_service.list_user_videos(user_id=str(current_user.id))
+            for video in updated_videos:
+                yield f"data: {json.dumps({'type': 'UPDATE', 'video': video.model_dump()})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

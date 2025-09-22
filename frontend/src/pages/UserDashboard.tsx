@@ -59,19 +59,36 @@ export default function UserDashboard() {
     }
   };
 
-  // Carrega vídeos do usuário
-  const loadUserVideos = async () => {
-    try {
-      const response = await api.get("/videos/me");
-      setVideos(response.data);
-    } catch (error) {
-      toast.error("Falha ao carregar vídeos.");
-    }
-  };
-
-  // Efeito inicial
   useEffect(() => {
-    loadUserVideos();
+    const eventSource = new EventSource(`${import.meta.env.VITE_API_URL}/videos/events`);
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'INITIAL' || data.type === 'UPDATE') {
+        setVideos(prevVideos => {
+          const existingIndex = prevVideos.findIndex(v => v.id === data.video.id);
+          if (existingIndex >= 0) {
+            // Atualiza o vídeo existente
+            const newVideos = [...prevVideos];
+            newVideos[existingIndex] = data.video;
+            return newVideos;
+          } else {
+            // Adiciona novo vídeo
+            return [...prevVideos, data.video];
+          }
+        });
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("Erro na conexão SSE:", error);
+      eventSource.close();
+    };
+
+    // Cleanup ao desmontar o componente
+    return () => {
+      eventSource.close();
+    };
   }, []);
 
   // Componente de card de vídeo

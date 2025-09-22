@@ -15,8 +15,8 @@ alembic~=1.16.1
 av~=14.4.0
 resampy~=0.4.3
 openai>=1.82.0
-httpx>=1.0.0b0
+# httpx>=1.0.0b0
 uvicorn>=0.34.2
 # intel-extension-for-pytorch==2.7.10+xpu
-torch>=2.7.0+xpu
+torch>=2.8.0
 numba>=0.61.2
