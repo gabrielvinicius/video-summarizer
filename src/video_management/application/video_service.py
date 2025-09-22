@@ -1,15 +1,14 @@
 import time
-
-import structlog  # Nova importação
-from uuid import uuid4, UUID
 from typing import Optional, Sequence
+from uuid import uuid4, UUID
 
-from main import VIDEO_UPLOADS_TOTAL, UPLOAD_DURATION
-from src.video_management.domain.video import Video, VideoStatus
-from src.storage.application.storage_service import StorageService
-from src.video_management.infrastructure.video_repository import VideoRepository
+import structlog
+
+from src.metrics.application.metrics_service import MetricsService
 from src.shared.events.event_bus import EventBus
-from prometheus_client import Counter
+from src.storage.application.storage_service import StorageService
+from src.video_management.domain.video import Video, VideoStatus
+from src.video_management.infrastructure.video_repository import VideoRepository
 
 # Obtém um logger estruturado
 logger = structlog.get_logger(__name__)
@@ -19,11 +18,13 @@ class VideoService:
             self,
             storage_service: StorageService,
             event_bus: EventBus,
-            video_repository: VideoRepository
+            video_repository: VideoRepository,
+            metrics_service: MetricsService,
     ):
         self.storage_service = storage_service
         self.event_bus = event_bus
         self.video_repository = video_repository
+        self.metrics_service = metrics_service
 
     async def upload_video(self, user_id: str, file: bytes, filename: str) -> Video:
         start_time = time.time()
@@ -63,13 +64,13 @@ class VideoService:
             logger.info("video_upload.completed", video_id=str(video_id))
             duration = time.time() - start_time
             # Registrar sucesso no upload
-            VIDEO_UPLOADS_TOTAL.labels(status='success').inc()
-            UPLOAD_DURATION.labels(video_id=video_id).observe(duration)  # Nova métrica
+            self.metrics_service.increment_video_upload('success')
+            self.metrics_service.observe_upload_duration(video_id=video_id,duration=duration)  # Nova métrica
 
             return saved_video
 
         except Exception as e:
-            VIDEO_UPLOADS_TOTAL.labels(status='failure').inc()
+            self.metrics_service.increment_video_upload('failure')
             logger.error("video_upload.failed", video_id=str(video_id) if 'video_id' in locals() else "unknown",
                          error=str(e))
             # Cleanup if upload failed

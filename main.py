@@ -12,6 +12,7 @@ from src.video_management.api.routers import router as video_router
 from src.summarization.api.routers import router as summary_router
 from src.notifications.api.routers import router as notification_router
 from src.transcription.api.routers import router as transcription_router
+from src.metrics.api.routers import router as metrics_router
 
 # Importe dependências de banco de dados e container
 from src.shared.container import build_container, ApplicationContainer
@@ -197,6 +198,11 @@ app.include_router(
     dependencies=[Depends(get_service("event_bus"))]
 )
 
+app.include_router(
+    metrics_router,
+    prefix="/metrics",
+    tags=["Metrics"]
+)
 
 # Rota de saúde da aplicação
 @app.get("/health", tags=["Sistema"])

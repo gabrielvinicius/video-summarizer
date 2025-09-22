@@ -6,6 +6,7 @@ from typing import Optional
 import structlog
 
 from main import VIDEO_PROCESSING_DURATION, TRANSCRIPTIONS_TOTAL, TRANSCRIPTION_DURATION
+from src.metrics.application.metrics_service import MetricsService
 from src.transcription.domain.transcription import Transcription, TranscriptionStatus
 from src.shared.events.event_bus import EventBus
 from src.storage.application.storage_service import StorageService
@@ -25,12 +26,14 @@ class TranscriptionService:
             event_bus: EventBus,
             transcription_repository: TranscriptionRepository,
             video_service: VideoService,
+            metrics_service: MetricsService,
     ):
         self.speech_recognition = speech_recognition
         self.storage_service = storage_service
         self.event_bus = event_bus
         self.transcription_repo = transcription_repository
         self.video_service = video_service
+        self.metrics_service = metrics_service
 
     async def process_transcription(self, video_id: str) -> Transcription:
         start_time = time.time()
@@ -55,9 +58,8 @@ class TranscriptionService:
             text = await self._transcribe_audio(audio_bytes, transcription.video_id)
 
             duration = time.time() - start_time
-            VIDEO_PROCESSING_DURATION.labels(stage='transcription').observe(duration)
-            TRANSCRIPTION_DURATION.labels(video_id=video_id).observe(duration)  # Nova métrica
-            TRANSCRIPTIONS_TOTAL.labels(status='success').inc()
+            self.metrics_service.increment_transcription('success')
+            self.metrics_service.observe_transcription_duration(video_id, duration)
 
             logger.info("transcription.completed", video_id=video_id, duration=duration)
 
@@ -65,7 +67,7 @@ class TranscriptionService:
 
         except Exception as e:
             duration = time.time() - start_time
-            TRANSCRIPTIONS_TOTAL.labels(status='failure').inc()
+            self.metrics_service.increment_transcription('failure')
             logger.error("transcription.failed", video_id=video_id, error=str(e), duration=duration)
             await self._handle_failure(video_id, e)
             raise
