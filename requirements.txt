@@ -20,3 +20,6 @@ uvicorn>=0.34.2
 # intel-extension-for-pytorch==2.7.10+xpu
 torch>=2.8.0
 numba>=0.61.2
+# Observabilidade
+structlog>=24.4.0
+prometheus-client>=0.21.0

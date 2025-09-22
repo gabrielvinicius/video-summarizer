@@ -1,7 +1,10 @@
 import asyncio
-from fastapi import FastAPI, Depends, Request
+import time
+
+from fastapi import FastAPI, Depends, Request,Response
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 # Importe todas as rotas
 from src.auth.api.routers import router as auth_router
@@ -20,6 +23,71 @@ from src.transcription.application.event_handlers import register_event_handlers
 from src.summarization.application.event_handlers import register_event_handlers as register_summary_handlers
 from src.notifications.application.event_handlers import register_event_handlers as register_notification_handlers
 
+# --- Métricas Prometheus (existentes) ---
+REQUEST_COUNT = Counter(
+    'http_requests_total',
+    'Total HTTP Requests',
+    ['method', 'endpoint', 'status_code']
+)
+REQUEST_LATENCY = Histogram(
+    'http_request_duration_seconds',
+    'HTTP Request Latency',
+    ['method', 'endpoint']
+)
+# ----------------------------
+
+# --- Novas Métricas de Negócio ---
+# Contadores para operações de alto nível
+VIDEO_UPLOADS_TOTAL = Counter(
+    'video_uploads_total',
+    'Total de vídeos enviados',
+    ['status']  # status: success, failure
+)
+
+TRANSCRIPTIONS_TOTAL = Counter(
+    'transcriptions_total',
+    'Total de transcrições processadas',
+    ['status']  # status: success, failure
+)
+
+SUMMARIZATIONS_TOTAL = Counter(
+    'summarizations_total',
+    'Total de sumarizações geradas',
+    ['status']  # status: success, failure
+)
+
+# Histogramas para tempos de processamento
+VIDEO_PROCESSING_DURATION = Histogram(
+    'video_processing_duration_seconds',
+    'Tempo total de processamento de um vídeo (upload + transcrição + sumarização)',
+    ['stage']  # stage: transcription, summarization
+)
+
+# --- Novas Métricas de Duração por Serviço ---
+TRANSCRIPTION_DURATION = Histogram(
+    'transcription_duration_seconds',
+    'Tempo de processamento da transcrição por vídeo',
+    ['video_id']  # Etiqueta para rastrear por vídeo
+)
+
+SUMMARIZATION_DURATION = Histogram(
+    'summarization_duration_seconds',
+    'Tempo de processamento da sumarização por vídeo',
+    ['video_id']  # Etiqueta para rastrear por vídeo
+)
+UPLOAD_DURATION = Histogram(
+    'summarization_duration_seconds',
+    'Tempo de processamento de upload por vídeo',
+    ['video_id']  # Etiqueta para rastrear por vídeo
+)
+# ----------------------------
+# Gauges para estado do sistema
+ACTIVE_PROCESSES = Gauge(
+    'active_video_processes',
+    'Número de vídeos atualmente sendo processados'
+)
+
+# ----------------------------
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -61,6 +129,32 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# --- Middleware para Métricas ---
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    method = request.method
+    endpoint = request.url.path
+
+    # Inicia o timer
+    start_time = time.time()
+
+    response = await call_next(request)
+
+    # Calcula a latência
+    latency = time.time() - start_time
+
+    # Atualiza as métricas
+    REQUEST_COUNT.labels(method=method, endpoint=endpoint, status_code=response.status_code).inc()
+    REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(latency)
+
+    return response
+# ----------------------------
+
+# --- Endpoint de Métricas ---
+@app.get("/metrics")
+async def get_metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+# ----------------------------
 
 # Função para injetar serviços nas rotas
 def get_service(service_name: str):

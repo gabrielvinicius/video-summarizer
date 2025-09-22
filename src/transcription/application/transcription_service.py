@@ -1,7 +1,11 @@
 # src/transcription/application/transcription_service.py
 import logging
+import time
 from typing import Optional
 
+import structlog
+
+from main import VIDEO_PROCESSING_DURATION, TRANSCRIPTIONS_TOTAL, TRANSCRIPTION_DURATION
 from src.transcription.domain.transcription import Transcription, TranscriptionStatus
 from src.shared.events.event_bus import EventBus
 from src.storage.application.storage_service import StorageService
@@ -10,7 +14,7 @@ from src.transcription.infrastructure.speech_recognition import ISpeechRecogniti
 from src.shared.utils.id_generator import generate_id
 from src.video_management.application.video_service import VideoService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TranscriptionService:
@@ -29,13 +33,15 @@ class TranscriptionService:
         self.video_service = video_service
 
     async def process_transcription(self, video_id: str) -> Transcription:
+        start_time = time.time()
+        logger.info("transcription.started", video_id=video_id)
+
         try:
-            # Publica início da transcrição
             await self._publish_event("transcription_started", {"video_id": video_id})
 
-            # Verifica se já existe transcrição
             transcription = await self._get_existing_transcription(video_id)
             if transcription and transcription.text and transcription.status == TranscriptionStatus.COMPLETED:
+                logger.info("transcription.completed", video_id=video_id, from_cache=True)
                 await self._publish_event("transcription_completed", {
                     "video_id": transcription.video_id,
                     "transcription_id": transcription.id
@@ -45,14 +51,22 @@ class TranscriptionService:
             if transcription is None:
                 transcription = await self._create_transcription_record(video_id)
 
-            # Download + transcrição
             audio_bytes = await self._download_audio(transcription.video_id)
             text = await self._transcribe_audio(audio_bytes, transcription.video_id)
 
-            # Finaliza com sucesso
+            duration = time.time() - start_time
+            VIDEO_PROCESSING_DURATION.labels(stage='transcription').observe(duration)
+            TRANSCRIPTION_DURATION.labels(video_id=video_id).observe(duration)  # Nova métrica
+            TRANSCRIPTIONS_TOTAL.labels(status='success').inc()
+
+            logger.info("transcription.completed", video_id=video_id, duration=duration)
+
             return await self._finalize_success(video_id, transcription, text)
 
         except Exception as e:
+            duration = time.time() - start_time
+            TRANSCRIPTIONS_TOTAL.labels(status='failure').inc()
+            logger.error("transcription.failed", video_id=video_id, error=str(e), duration=duration)
             await self._handle_failure(video_id, e)
             raise
 
@@ -76,14 +90,14 @@ class TranscriptionService:
         try:
             return await self.storage_service.download(video.file_path)
         except Exception as e:
-            logger.error(f"Audio download failed for video {video_id}: {str(e)}")
+            logger.error("transcription.download_failed", video_id=video_id, error=str(e))
             raise RuntimeError("Audio download failed") from e
 
     async def _transcribe_audio(self, audio_bytes: bytes, video_id: str) -> str:
         try:
             return await self.speech_recognition.transcribe(audio_bytes)
         except Exception as e:
-            logger.error(f"Transcription failed for video {video_id}: {str(e)}")
+            logger.error("transcription.transcribe_failed", video_id=video_id, error=str(e))
             raise RuntimeError("Transcription failed") from e
 
     async def _finalize_success(self, video_id: str, transcription: Transcription, text: str) -> Transcription:
