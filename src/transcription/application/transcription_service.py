@@ -5,7 +5,7 @@ from typing import Optional
 
 import structlog
 
-from main import VIDEO_PROCESSING_DURATION, TRANSCRIPTIONS_TOTAL, TRANSCRIPTION_DURATION
+
 from src.metrics.application.metrics_service import MetricsService
 from src.transcription.domain.transcription import Transcription, TranscriptionStatus
 from src.shared.events.event_bus import EventBus
@@ -14,6 +14,7 @@ from src.transcription.infrastructure.transcription_repository import Transcript
 from src.transcription.infrastructure.speech_recognition import ISpeechRecognition
 from src.shared.utils.id_generator import generate_id
 from src.video_management.application.video_service import VideoService
+from src.analytics.application.analytics_service import AnalyticsService
 
 logger = structlog.get_logger(__name__)
 
@@ -27,6 +28,7 @@ class TranscriptionService:
             transcription_repository: TranscriptionRepository,
             video_service: VideoService,
             metrics_service: MetricsService,
+            analytics_service: AnalyticsService,
     ):
         self.speech_recognition = speech_recognition
         self.storage_service = storage_service
