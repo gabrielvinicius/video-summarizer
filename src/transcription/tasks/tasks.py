@@ -14,7 +14,7 @@ from src.transcription.infrastructure.dependencies import get_transcription_repo
 from src.video_management.application.dependencies import get_video_service
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def process_transcription_task(self, video_id: str):
     """
     Celery async task to process video transcription.

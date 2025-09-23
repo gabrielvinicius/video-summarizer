@@ -5,7 +5,7 @@ import asyncio
 from src.shared.container import build_container
 from src.shared.infrastructure.database import AsyncSessionLocal
 
-@shared_task
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def process_summary_task(transcription_id: str):
     """
     Celery entrypoint to trigger summarization pipeline for a transcription.

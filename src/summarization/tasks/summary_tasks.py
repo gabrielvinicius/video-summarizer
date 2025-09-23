@@ -4,7 +4,7 @@ from src.shared.events.event_bus import EventBus
 from ..infrastructure.huggingface_adapter import HuggingFaceSummarizer
 
 
-@shared_task
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def generate_summary_task(transcription_id: str):
     event_bus = EventBus()
     llm_adapter = HuggingFaceSummarizer()  # Injetar OpenAI/HuggingFace
