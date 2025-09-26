@@ -1,5 +1,6 @@
 # src/video_management/api/routers.py
 import io
+import os
 from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, UploadFile, Depends, HTTPException, status, File, Query
@@ -8,23 +9,19 @@ from fastapi.encoders import jsonable_encoder
 
 from src.auth.api.dependencies import get_current_user
 from src.auth.domain.user import User
-from src.shared.dependencies import get_service, get_video_queries # Import the new query dependency
-from src.shared.events.domain_events import TranscriptionRequested
-from src.shared.events.event_bus import EventBus
+from src.shared.dependencies import get_service, get_video_queries
 from src.video_management.application.commands.upload_video_command import UploadVideoCommand
 from src.video_management.application.video_service import VideoService
-from src.video_management.application.queries.video_queries import VideoQueries # Import the query class
+from src.video_management.application.queries.video_queries import VideoQueries
 from .schemas import VideoResponse, VideoDetailResponse
-from ..domain.video import Video, VideoStatus
+from .dependencies import get_video_settings
+from ..config.settings import VideoSettings
 
 router = APIRouter(
     prefix="/videos",
     tags=["Videos"],
     responses={404: {"description": "Not found"}},
 )
-
-ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
-MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB
 
 
 @router.post("/", response_model=VideoResponse, status_code=status.HTTP_201_CREATED, summary="Create a new video by uploading a file")
@@ -33,15 +30,16 @@ async def create_video(
     storage_provider: Optional[str] = Query("local", description="The storage provider to use (e.g., 'local', 's3')."),
     current_user: User = Depends(get_current_user),
     video_service: VideoService = Depends(get_service("video_service")),
+    settings: VideoSettings = Depends(get_video_settings),
 ):
     """Uploads a video file to create a new video resource."""
     try:
-        file_ext = file.filename.split('.')[-1] if file.filename else ''
-        if f".{file_ext}" not in ALLOWED_EXTENSIONS:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid file format. Allowed formats: {', '.join(ALLOWED_EXTENSIONS)}")
+        _, file_ext = os.path.splitext(file.filename or "")
+        if file_ext.lower() not in settings.allowed_extensions:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid file format. Allowed formats: {', '.join(settings.allowed_extensions)}")
 
-        if file.size > MAX_FILE_SIZE:
-            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=f"File too large. Max size is {MAX_FILE_SIZE // (1024 * 1024)}MB")
+        if file.size > settings.max_file_size_bytes:
+            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=f"File too large. Max size is {settings.max_file_size_mb}MB")
 
         command = UploadVideoCommand(user_id=str(current_user.id), file=await file.read(), filename=file.filename, storage_provider=storage_provider)
         video = await video_service.create_video(command)
@@ -68,7 +66,7 @@ async def get_video_by_id(
 ):
     """Retrieves detailed metadata for a specific video."""
     if current_user.role.value == "admin":
-        video = await video_queries.get_video_by_id(video_id=str(video_id))
+        video = await video_queries.get_by_id(video_id=str(video_id))
     else:
         video = await video_queries.get_video_by_user_by_id(video_id=str(video_id), user_id=str(current_user.id))
     
@@ -81,17 +79,18 @@ async def get_video_by_id(
 async def request_video_transcription(
     video_id: UUID,
     provider: Optional[str] = Query("whisper", description="The transcription provider to use (e.g., 'whisper', 'fastwhisper')."),
-    video_queries: VideoQueries = Depends(get_video_queries),
-    event_bus: EventBus = Depends(get_service("event_bus")),
+    video_service: VideoService = Depends(get_service("video_service")),
+    # No need to inject video_queries or event_bus here anymore
 ):
     """Starts an asynchronous transcription process for a video."""
-    video = await video_queries.get_video_by_id(str(video_id))
-    if not video:
-        raise HTTPException(status_code=404, detail="Video not found")
-
-    if video.status == VideoStatus.PROCESSING:
-        raise HTTPException(status_code=409, detail="A transcription for this video is already in progress.")
-
-    event = TranscriptionRequested(video_id=str(video.id), provider=provider)
-    await event_bus.publish(event)
-    return {"message": "Transcription requested successfully"}
+    try:
+        await video_service.request_transcription(video_id=str(video_id), provider=provider)
+        return {"message": "Transcription requested successfully"}
+    except ValueError as e:
+        # Handle specific business logic errors from the service layer
+        if "not found" in str(e):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        else:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to start transcription: {str(e)}") from e

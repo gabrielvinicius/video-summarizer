@@ -33,6 +33,7 @@ from src.summarization.infrastructure.summary_repository import SummaryRepositor
 
 # Analytics
 from src.analytics.application.queries.analytics_queries import AnalyticsQueries
+from src.analytics.config.settings import AnalyticsSettings
 from src.analytics.infrastructure.analytics_repository import AnalyticsRepository
 
 # Metrics
@@ -77,7 +78,11 @@ class ApplicationContainer:
     def _setup_analytics_services(self, db_session: AsyncSession) -> None:
         """Configures analytics-related query handlers."""
         self._services["analytics_repository"] = AnalyticsRepository(db_session)
-        self._services["analytics_queries"] = AnalyticsQueries(analytics_repo=self._services["analytics_repository"])
+        self._services["analytics_settings"] = AnalyticsSettings()
+        self._services["analytics_queries"] = AnalyticsQueries(
+            analytics_repo=self._services["analytics_repository"],
+            settings=self._services["analytics_settings"]
+        )
 
     def _setup_auth_services(self, db_session: AsyncSession) -> None:
         self._services["user_repository"] = UserRepository(db=db_session)
@@ -99,11 +104,11 @@ class ApplicationContainer:
 
     async def _setup_video_services(self, db_session: AsyncSession) -> None:
         self._services["video_repository"] = await get_video_repository(db_session)
+        self._services["video_queries"] = VideoQueries(video_repository=self._services["video_repository"])
         upload_video_handler = UploadVideoCommandHandler(storage_service_factory=self._services["storage_service_factory"], event_bus=self._services["event_bus"], video_repository=self._services["video_repository"], metrics_service=self._services["metrics_service"])
         self._services["upload_video_handler"] = upload_video_handler
-        video_service = VideoService(upload_video_handler=upload_video_handler, video_repository=self._services["video_repository"], storage_service_factory=self._services["storage_service_factory"])
+        video_service = VideoService(upload_video_handler=upload_video_handler, video_repository=self._services["video_repository"], storage_service_factory=self._services["storage_service_factory"], video_queries=self._services["video_queries"], event_bus=self._services["event_bus"])
         self._services["video_service"] = video_service
-        self._services["video_queries"] = VideoQueries(video_repository=self._services["video_repository"])
 
     async def _setup_transcription_services(self, db_session: AsyncSession) -> None:
         self._services["transcription_repository"] = await get_transcription_repository(db_session)
