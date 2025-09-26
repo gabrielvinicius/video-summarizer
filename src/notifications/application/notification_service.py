@@ -51,3 +51,7 @@ class NotificationService:
 
         await self.notification_repo.save(notification)
         return notification
+
+    async def get_notification_by_id(self, notification_id: str) -> Optional[Notification]:
+        """Retrieves a notification by its ID."""
+        return await self.notification_repo.find_by_id(notification_id)

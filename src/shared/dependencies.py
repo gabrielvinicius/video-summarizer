@@ -24,7 +24,7 @@ def get_service(service_name: str):
     return _get_service
 
 
-# Dependências específicas para injeção em rotas
-
+# Specific service dependencies for route injection
 get_summarization_service = get_service("summarization_service")
 get_auth_service = get_service("auth_service")
+get_notification_service = get_service("notification_service") # Added notification service getter

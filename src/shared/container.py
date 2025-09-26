@@ -17,14 +17,10 @@ from src.storage.infrastructure.dependencies import get_storage_service
 
 # Transcription
 from src.transcription.application.dependencies import get_transcription_service
-from src.transcription.infrastructure.dependencies import (
-    get_speech_recognition,
-    get_transcription_repository
-)
+from src.transcription.infrastructure.dependencies import get_speech_recognition, get_transcription_repository
 
 # Summarization
 from src.summarization.application.summarization_service import SummarizationService
-from src.summarization.domain.interfaces import ISummaryRepository
 from src.summarization.infrastructure.huggingface_summarizer import HuggingFaceSummarizer
 from src.summarization.infrastructure.summary_repository import SummaryRepository
 
@@ -35,6 +31,14 @@ from src.analytics.infrastructure.analytics_repository import AnalyticsRepositor
 # Metrics
 from src.metrics.application.metrics_service import MetricsService
 from src.metrics.infrastructure.prometheus_provider import PrometheusMetricsProvider
+
+# Notifications
+from src.notifications.application.notification_service import NotificationService
+from src.notifications.config.settings import SmtpSettings
+from src.notifications.infrastructure.notification_repository import NotificationRepository
+from src.notifications.infrastructure.smtp_adapter import SMTPAdapter
+from src.notifications.infrastructure.sms_adapter import SmsAdapter
+from src.notifications.infrastructure.webhook_adapter import WebhookAdapter
 
 
 class ApplicationContainer:
@@ -51,6 +55,7 @@ class ApplicationContainer:
         self._setup_metrics_services()
         self._setup_analytics_services(db_session)
         self._setup_auth_services(db_session)
+        self._setup_notification_services(db_session) # Added notification setup
         await self._setup_video_services(db_session)
         await self._setup_transcription_services(db_session)
         await self._setup_summarization_services(db_session)
@@ -59,26 +64,42 @@ class ApplicationContainer:
         await self._register_event_handlers()
 
     def _setup_metrics_services(self) -> None:
-        """Configures metrics services."""
         self._services["metrics_provider"] = PrometheusMetricsProvider()
-        self._services["metrics_service"] = MetricsService(
-            provider=self._services["metrics_provider"]
-        )
+        self._services["metrics_service"] = MetricsService(provider=self._services["metrics_provider"])
 
     def _setup_analytics_services(self, db_session: AsyncSession) -> None:
-        """Configures analytics services."""
         self._services["analytics_repository"] = AnalyticsRepository(db_session)
-        self._services["analytics_service"] = AnalyticsService(
-            analytics_repo=self._services["analytics_repository"]
+        self._services["analytics_service"] = AnalyticsService(analytics_repo=self._services["analytics_repository"])
+
+    def _setup_auth_services(self, db_session: AsyncSession) -> None:
+        self._services["user_repository"] = UserRepository(db=db_session)
+        self._services["auth_service"] = AuthService(user_repository=self._services["user_repository"])
+
+    def _setup_notification_services(self, db_session: AsyncSession) -> None:
+        """Configures notification services."""
+        smtp_settings = SmtpSettings()
+        self._services["email_adapter"] = SMTPAdapter(
+            host=smtp_settings.smtp_host,
+            port=smtp_settings.smtp_port,
+            username=smtp_settings.smtp_user,
+            password=smtp_settings.smtp_password
+        )
+        self._services["sms_adapter"] = SmsAdapter() # Placeholder
+        self._services["webhook_adapter"] = WebhookAdapter() # Placeholder
+        self._services["notification_repository"] = NotificationRepository(db=db_session)
+        self._services["notification_service"] = NotificationService(
+            email_adapter=self._services["email_adapter"],
+            sms_adapter=self._services["sms_adapter"],
+            webhook_adapter=self._services["webhook_adapter"],
+            notification_repository=self._services["notification_repository"],
+            user_repository=self._services["user_repository"]
         )
 
     async def _setup_video_services(self, db_session: AsyncSession) -> None:
-        """Configures video-related services."""
         self._services["video_repository"] = await get_video_repository(db_session)
         self._services["video_service"] = await get_video_service(db_session)
 
     async def _setup_transcription_services(self, db_session: AsyncSession) -> None:
-        """Configures transcription services."""
         self._services["transcription_repository"] = await get_transcription_repository(db_session)
         self._services["speech_recognizer"] = await get_speech_recognition()
         self._services["transcription_service"] = await get_transcription_service(
@@ -89,52 +110,36 @@ class ApplicationContainer:
         )
 
     async def _setup_summarization_services(self, db_session: AsyncSession) -> None:
-        """Configures summarization services."""
         summary_repo = SummaryRepository(db_session)
         self._services["summary_repository"] = summary_repo
         self._services["summarizer"] = HuggingFaceSummarizer()
         self._services["summarization_service"] = SummarizationService(
             summarizer=self._services["summarizer"],
-            summary_repo=summary_repo,  # Injetando a instância concreta que implementa a interface
+            summary_repo=summary_repo,
             transcription_service=self._services["transcription_service"],
             metrics_service=self._services["metrics_service"],
             analytics_service=self._services["analytics_service"],
             event_bus=self._services["event_bus"]
         )
 
-    def _setup_auth_services(self, db_session: AsyncSession) -> None:
-        """Configures authentication services."""
-        self._services["user_repository"] = UserRepository(db=db_session)
-        self._services["auth_service"] = AuthService(user_repository=self._services["user_repository"])
-
     async def _register_event_handlers(self) -> None:
-        """Registers all event handlers."""
-        from src.transcription.application.event_handlers import (
-            register_event_handlers as register_transcription_handlers
-        )
-        from src.notifications.application.event_handlers import (
-            register_event_handlers as register_notification_handlers
-        )
-        from src.summarization.application.event_handlers import (
-            register_event_handlers as register_summary_handlers
-        )
+        from src.transcription.application.event_handlers import register_event_handlers as register_transcription_handlers
+        from src.notifications.application.event_handlers import register_event_handlers as register_notification_handlers
+        from src.summarization.application.event_handlers import register_event_handlers as register_summary_handlers
         event_bus = self._services["event_bus"]
         await register_transcription_handlers(event_bus)
         await register_summary_handlers(event_bus)
         await register_notification_handlers(event_bus)
 
     def __getitem__(self, key: str) -> Any:
-        """Access services via key."""
         return self._services[key]
 
     async def dispose(self) -> None:
-        """Clean up resources."""
         if "event_bus" in self._services and hasattr(self._services["event_bus"], "stop_listener"):
             await self._services["event_bus"].stop_listener()
 
 
 async def build_container(db_session: AsyncSession) -> ApplicationContainer:
-    """Factory function to create and initialize the container."""
     container = ApplicationContainer()
     await container.initialize(db_session)
     return container

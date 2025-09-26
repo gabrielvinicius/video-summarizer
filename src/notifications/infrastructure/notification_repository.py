@@ -1,5 +1,7 @@
+from typing import List, Optional
+from uuid import UUID
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
 from src.notifications.domain.notification import Notification
 
 
@@ -7,30 +9,43 @@ class NotificationRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    def find_by_id(self, notification_id: str) -> Notification | None:
-        return self.db.query(Notification).filter(Notification.id == notification_id).first()
+    async def find_by_id(self, notification_id: str) -> Optional[Notification]:
+        """Finds a notification by its ID."""
+        result = await self.db.execute(
+            select(Notification).where(Notification.id == UUID(notification_id))
+        )
+        return result.scalar_one_or_none()
 
-    def save(self, notification: Notification) -> Notification:
+    async def save(self, notification: Notification) -> Notification:
+        """Saves a notification to the database."""
         self.db.add(notification)
-        self.db.commit()
-        self.db.refresh(notification)
+        await self.db.commit()
+        await self.db.refresh(notification)
         return notification
 
-    def list_by_user(self, user_id: str) -> list[Notification]:
-        return self.db.query(Notification).filter(Notification.user_id == user_id).all()
+    async def list_by_user(self, user_id: str) -> List[Notification]:
+        """Lists all notifications for a specific user."""
+        result = await self.db.execute(
+            select(Notification).where(Notification.user_id == UUID(user_id))
+        )
+        return result.scalars().all()
 
-    def mark_as_read(self, notification_id: str) -> bool:
-        notification = self.find_by_id(notification_id)
-        if notification:
-            notification.read = True
-            self.db.commit()
-            return True
-        return False
+    async def mark_as_read(self, notification_id: str) -> bool:
+        """Marks a notification as read."""
+        stmt = (
+            update(Notification)
+            .where(Notification.id == UUID(notification_id))
+            .values(read=True)
+        )
+        result = await self.db.execute(stmt)
+        await self.db.commit()
+        return result.rowcount > 0
 
-    def delete(self, notification_id: str) -> bool:
-        notification = self.find_by_id(notification_id)
+    async def delete(self, notification_id: str) -> bool:
+        """Deletes a notification by its ID."""
+        notification = await self.find_by_id(notification_id)
         if notification:
-            self.db.delete(notification)
-            self.db.commit()
+            await self.db.delete(notification)
+            await self.db.commit()
             return True
         return False

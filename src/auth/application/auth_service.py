@@ -1,6 +1,6 @@
 from uuid import UUID
 from passlib.context import CryptContext
-from typing import Optional
+from typing import Optional, Sequence
 
 from src.auth.config.settings import AuthSettings
 from src.auth.domain.user import User, UserRole
@@ -47,3 +47,7 @@ class AuthService:
 
     async def get_user_by_id(self, user_uuid: str) -> User:
         return await self.user_repository.find_by_id(UUID(user_uuid))
+
+    async def list_all_users(self) -> Sequence[User]:
+        """Lists all users."""
+        return await self.user_repository.list_all()
