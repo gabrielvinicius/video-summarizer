@@ -19,29 +19,21 @@ class WhisperTranscriber(ISpeechRecognition):
         self.model = whisper.load_model(model_name)
         self.sample_rate = 16000  # Whisper expects 16kHz audio
 
-    async def transcribe(self, file: bytes) -> Optional[str]:
+    async def transcribe(self, file: bytes, language: str = "en") -> Optional[str]:
         path = None
         try:
             path = await self._decode_file_bytes(file)
-            # audio = whisper.load_audio(path)
-
-            # audio = await self._decode_audio_bytes(file)
-
-            # Ensure length compatibility with Whisper
-            # audio = whisper.pad_or_trim(audio)
-
-            # Generate mel spectrogram and transcribe
-            # mel = whisper.log_mel_spectrogram(audio).to(self.model.device)
-            # options = whisper.DecodingOptions(fp16=False)
-            # result = whisper.decode(self.model, mel, options)
-            result = self.model.transcribe(path)
+            
+            # Passa o parâmetro de idioma para o modelo Whisper
+            result = self.model.transcribe(path, language=language)
 
             return result["text"]
         except Exception as e:
             logger.error(f"Transcription failed: {str(e)}")
             raise RuntimeError(f"Transcription error: {str(e)}")
         finally:
-            os.unlink(path)
+            if path and os.path.exists(path):
+                os.unlink(path)
 
     async def _decode_audio_bytes(self, file_bytes: bytes) -> np.ndarray:
         """Decodes audio or audio-track-from-video to float32 mono 16kHz"""

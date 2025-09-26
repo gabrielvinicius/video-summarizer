@@ -1,24 +1,22 @@
 from celery import Celery
-from typing import Dict, Callable, Any, Optional, Coroutine, Union
+from typing import Dict, Callable, Any, Optional, Coroutine, Union, Type
 import json
 import asyncio
 import redis.asyncio as aioredis
 import logging
+
 from src.shared.config.broker_settings import BrokerSettings
+from src.shared.events.domain_events import DomainEvent  # Importação adicionada
 
 # Configurações
 settings = BrokerSettings()
 logger = logging.getLogger(__name__)
 
-# Celery worker configuration
+# Celery (mantido para os tasks assíncronos)
 celery = Celery(__name__, broker=settings.redis_url)
 celery.conf.task_serializer = 'json'
 celery.conf.result_serializer = 'json'
 celery.conf.accept_content = ['json']
-celery.conf.task_default_queue = 'default'
-celery.conf.task_default_exchange = 'default'
-celery.conf.task_default_routing_key = 'default'
-
 celery.autodiscover_tasks([
     "src.transcription.tasks",
     "src.summarization.tasks",
@@ -36,27 +34,36 @@ redis_client = aioredis.Redis(
 
 class EventBus:
     def __init__(self):
-        self.subscribers: Dict[str, list[Callable[[Any], Union[None, Coroutine]]]] = {}
+        self.subscribers: Dict[str, list[Callable[[Dict], Union[None, Coroutine]]]] = {}
         self._listener_task: Optional[asyncio.Task] = None
 
-    def subscribe(self, event_type: str, handler: Callable[[Any], Union[None, Coroutine]]):
-        """Registra um handler local para determinado tipo de evento."""
-        if event_type not in self.subscribers:
-            self.subscribers[event_type] = []
-        self.subscribers[event_type].append(handler)
+    def subscribe(self, event_type: Type[DomainEvent], handler: Callable[[Dict], Union[None, Coroutine]]):
+        """Registra um handler local para um tipo de evento de domínio."""
+        event_name = event_type.__name__
+        if event_name not in self.subscribers:
+            self.subscribers[event_name] = []
+        self.subscribers[event_name].append(handler)
 
-    async def publish(self, event_type: str, data: Any):
-        """Publica evento no Redis (consumido pelo listener)."""
+    async def publish(self, event: DomainEvent):
+        """Publica um evento de domínio no Redis."""
+        event_type = event.__class__.__name__
+        data = event.to_dict()
         try:
             await redis_client.publish(event_type, json.dumps(data, default=str))
         except TypeError as e:
-            raise ValueError(f"Erro ao serializar payload: {e}")
+            raise ValueError(f"Erro ao serializar o payload do evento: {e}")
 
     async def _listen(self):
         """Loop principal para escutar eventos Redis e despachar handlers."""
+        # O restante do código não precisa de alteração, pois já trabalha com
+        # o nome do evento como string e o payload como um dicionário JSON.
         while True:
             try:
                 pubsub = redis_client.pubsub()
+                if not self.subscribers:
+                    await asyncio.sleep(1) # Evita loop ocupado se não houver assinantes
+                    continue
+
                 await pubsub.subscribe(*self.subscribers.keys())
 
                 async for message in pubsub.listen():
@@ -75,7 +82,7 @@ class EventBus:
                                     handler(data)
 
             except Exception as e:
-                logger.warning(f"[EventBus] Redis error: {e}. Retentando em 5s...")
+                logger.warning(f"[EventBus] Erro no Redis: {e}. Tentando novamente em 5s...")
                 await asyncio.sleep(5)
 
     async def start_listener(self):
@@ -85,10 +92,12 @@ class EventBus:
             logger.info("[EventBus] Listener iniciado.")
 
     async def stop_listener(self):
-        """Encerra conexões com Redis (opcional para shutdown elegante)."""
+        """Encerra conexões com Redis."""
         try:
+            if self._listener_task:
+                self._listener_task.cancel()
             await redis_client.close()
-            logger.info("[EventBus] Redis client encerrado.")
+            logger.info("[EventBus] Cliente Redis encerrado.")
         except Exception as e:
             logger.error(f"[EventBus] Falha ao encerrar Redis: {e}")
 

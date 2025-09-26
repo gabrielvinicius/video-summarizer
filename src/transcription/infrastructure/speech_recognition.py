@@ -1,12 +1,10 @@
 from abc import ABC, abstractmethod
-
-import whisper
 from typing import Optional
-import tempfile
 
 
 class ISpeechRecognition(ABC):
 
     @abstractmethod
-    async def transcribe(self, file: bytes) -> Optional[str]:
+    async def transcribe(self, file: bytes, language: str = "en") -> Optional[str]:
+        """Transcribes an audio file to text, with an optional language hint."""
         pass

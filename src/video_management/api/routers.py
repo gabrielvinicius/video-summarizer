@@ -10,10 +10,10 @@ from fastapi.encoders import jsonable_encoder
 
 from src.auth.api.dependencies import get_current_user
 from src.auth.domain.user import User
+from src.shared.events.domain_events import VideoUploaded
 from src.video_management.api.dependencies import get_video_service
 from src.video_management.application.video_service import VideoService
 from .schemas import VideoResponse, VideoDetailResponse
-# from src.transcription.tasks.tasks import process_transcription_task
 from ..domain.video import Video, VideoStatus
 
 router = APIRouter(
@@ -66,7 +66,7 @@ async def upload_video(
                 detail=f"File too large. Max size is {max_size_mb}MB"
             )
 
-        # Processar upload
+        # Processar upload (o serviço já publica o evento)
         video = await video_service.upload_video(
             user_id=str(current_user.id),
             file=await file.read(),
@@ -137,7 +137,6 @@ async def get_video_details(
     """
     try:
         if current_user.role.value == "admin":
-            # Admin can access any video
             video = await video_service.get_video_by_id(video_id=str(video_id))
             return jsonable_encoder(video)
 
@@ -183,7 +182,6 @@ async def download_video(
         )
 
         if current_user.role.value == "admin":
-            # Admin can access any video
             video = await video_service.get_video_by_id(video_id=str(video_id))
 
         if not video:
@@ -192,7 +190,6 @@ async def download_video(
                 detail="Video not found"
             )
 
-        # Baixar o conteúdo
         content, filename = await video_service.storage_service.download(video.file_path)
 
         if content is None:
@@ -240,32 +237,23 @@ async def start_transcription(
     - Returns: Confirmation message
     """
     try:
-        # Verificar permissões e estado do vídeo
         video = await video_service.get_video_by_user_by_id(
             video_id=str(video_id),
             user_id=str(current_user.id),
-            # is_admin=(current_user.role.value == "admin")
         )
 
         if current_user.role.value == "admin":
-            # Admin can access any video
             video = await video_service.get_video_by_id(video_id=str(video_id))
 
-        # Verificar se a transcrição já está em andamento
         if video.status == VideoStatus.PROCESSING.value:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Transcription is already in progress"
             )
 
-        # Publish event
-        await video_service.event_bus.publish("video_uploaded", {
-            "video_id": video.id,
-            "file_path": video.file_path,
-            "user_id": video.user_id
-        })
-        # Disparar tarefa de transcrição
-        # process_transcription_task.delay(str(video_id))
+        # Publica o evento tipado para iniciar a transcrição
+        event = VideoUploaded(video_id=str(video.id), user_id=str(video.user_id))
+        await video_service.event_bus.publish(event)
 
         return {"message": "Transcription started successfully"}
 
@@ -286,14 +274,10 @@ async def video_events(
     SSE endpoint para atualizações em tempo real do status dos vídeos.
     """
     async def event_generator():
-        # Envia o estado inicial de todos os vídeos do usuário
         videos = await video_service.list_user_videos(user_id=str(current_user.id))
         for video in videos:
             yield f"data: {json.dumps({'type': 'INITIAL', 'video': video.model_dump()})}\n\n"
 
-        # Mantém a conexão aberta e envia atualizações conforme os eventos acontecem
-        # Em um sistema real, você escutaria um canal Redis para eventos `video_status_changed`.
-        # Para demonstração, faremos polling a cada 5 segundos.
         while True:
             await asyncio.sleep(5)
             updated_videos = await video_service.list_user_videos(user_id=str(current_user.id))

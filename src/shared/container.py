@@ -1,27 +1,40 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any
 
+# Shared
+from src.shared.events.event_bus import get_event_bus
+
+# Auth
 from src.auth.application.auth_service import AuthService
 from src.auth.infrastructure.user_repository import UserRepository
-from src.shared.events.event_bus import get_event_bus
-# Transcrição
+
+# Video
+from src.video_management.application.dependencies import get_video_service
+from src.video_management.infrastructure.dependencies import get_video_repository
+
+# Storage
+from src.storage.infrastructure.dependencies import get_storage_service
+
+# Transcription
+from src.transcription.application.dependencies import get_transcription_service
 from src.transcription.infrastructure.dependencies import (
     get_speech_recognition,
     get_transcription_repository
 )
-from src.transcription.application.dependencies import get_transcription_service
 
-# Sumarização
-from src.summarization.infrastructure.summary_repository import SummaryRepository
-from src.summarization.infrastructure.huggingface_summarizer import HuggingFaceSummarizer
+# Summarization
 from src.summarization.application.summarization_service import SummarizationService
+from src.summarization.domain.interfaces import ISummaryRepository
+from src.summarization.infrastructure.huggingface_summarizer import HuggingFaceSummarizer
+from src.summarization.infrastructure.summary_repository import SummaryRepository
 
-# Vídeo
-from src.video_management.infrastructure.dependencies import get_video_repository
-from src.video_management.application.dependencies import get_video_service
+# Analytics
+from src.analytics.application.analytics_service import AnalyticsService
+from src.analytics.infrastructure.analytics_repository import AnalyticsRepository
 
-# Armazenamento
-from src.storage.infrastructure.dependencies import get_storage_service
+# Metrics
+from src.metrics.application.metrics_service import MetricsService
+from src.metrics.infrastructure.prometheus_provider import PrometheusMetricsProvider
 
 
 class ApplicationContainer:
@@ -29,33 +42,43 @@ class ApplicationContainer:
         self._services: Dict[str, Any] = {}
 
     async def initialize(self, db_session: AsyncSession) -> None:
-        """Inicializa todos os serviços e dependências"""
-        # Configuração compartilhada
+        """Initializes all services and dependencies."""
+        # Shared services
         self._services["event_bus"] = get_event_bus()
         self._services["storage_service"] = await get_storage_service()
 
-        #Configuração de autenticação
+        # Setup services per context
+        self._setup_metrics_services()
+        self._setup_analytics_services(db_session)
         self._setup_auth_services(db_session)
-
-        # Configuração de vídeo
         await self._setup_video_services(db_session)
-
-        # Configuração de transcrição
         await self._setup_transcription_services(db_session)
-
-        # Configuração de sumarização
         await self._setup_summarization_services(db_session)
 
-        # Registro de event handlers
+        # Register event handlers after all services are initialized
         await self._register_event_handlers()
 
+    def _setup_metrics_services(self) -> None:
+        """Configures metrics services."""
+        self._services["metrics_provider"] = PrometheusMetricsProvider()
+        self._services["metrics_service"] = MetricsService(
+            provider=self._services["metrics_provider"]
+        )
+
+    def _setup_analytics_services(self, db_session: AsyncSession) -> None:
+        """Configures analytics services."""
+        self._services["analytics_repository"] = AnalyticsRepository(db_session)
+        self._services["analytics_service"] = AnalyticsService(
+            analytics_repo=self._services["analytics_repository"]
+        )
+
     async def _setup_video_services(self, db_session: AsyncSession) -> None:
-        """Configura serviços relacionados a vídeos"""
+        """Configures video-related services."""
         self._services["video_repository"] = await get_video_repository(db_session)
         self._services["video_service"] = await get_video_service(db_session)
 
     async def _setup_transcription_services(self, db_session: AsyncSession) -> None:
-        """Configura serviços de transcrição"""
+        """Configures transcription services."""
         self._services["transcription_repository"] = await get_transcription_repository(db_session)
         self._services["speech_recognizer"] = await get_speech_recognition()
         self._services["transcription_service"] = await get_transcription_service(
@@ -66,22 +89,26 @@ class ApplicationContainer:
         )
 
     async def _setup_summarization_services(self, db_session: AsyncSession) -> None:
-        """Configura serviços de sumarização"""
-        self._services["summary_repository"] = SummaryRepository(db_session)
+        """Configures summarization services."""
+        summary_repo = SummaryRepository(db_session)
+        self._services["summary_repository"] = summary_repo
         self._services["summarizer"] = HuggingFaceSummarizer()
         self._services["summarization_service"] = SummarizationService(
             summarizer=self._services["summarizer"],
-            summary_repo=self._services["summary_repository"],
-            transcription_service=self._services["transcription_service"]
+            summary_repo=summary_repo,  # Injetando a instância concreta que implementa a interface
+            transcription_service=self._services["transcription_service"],
+            metrics_service=self._services["metrics_service"],
+            analytics_service=self._services["analytics_service"],
+            event_bus=self._services["event_bus"]
         )
 
     def _setup_auth_services(self, db_session: AsyncSession) -> None:
-
+        """Configures authentication services."""
         self._services["user_repository"] = UserRepository(db=db_session)
         self._services["auth_service"] = AuthService(user_repository=self._services["user_repository"])
 
     async def _register_event_handlers(self) -> None:
-        """Registra todos os event handlers"""
+        """Registers all event handlers."""
         from src.transcription.application.event_handlers import (
             register_event_handlers as register_transcription_handlers
         )
@@ -96,20 +123,18 @@ class ApplicationContainer:
         await register_summary_handlers(event_bus)
         await register_notification_handlers(event_bus)
 
-
-
     def __getitem__(self, key: str) -> Any:
-        """Acesso aos serviços através de chave"""
+        """Access services via key."""
         return self._services[key]
 
     async def dispose(self) -> None:
-        """Limpeza de recursos"""
+        """Clean up resources."""
         if "event_bus" in self._services and hasattr(self._services["event_bus"], "stop_listener"):
             await self._services["event_bus"].stop_listener()
 
 
 async def build_container(db_session: AsyncSession) -> ApplicationContainer:
-    """Factory function para criar e inicializar o container"""
+    """Factory function to create and initialize the container."""
     container = ApplicationContainer()
     await container.initialize(db_session)
     return container

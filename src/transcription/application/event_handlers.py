@@ -4,6 +4,9 @@ This module registers handlers for events related to video uploads and transcrip
 # src/transcription/application/event_handlers.py
 import logging
 from typing import Dict, Any
+
+# Importação dos eventos de domínio tipados
+from src.shared.events.domain_events import SummaryRequested, VideoUploaded
 from src.shared.events.event_bus import EventBus
 from src.transcription.tasks.tasks import process_transcription_task
 
@@ -16,34 +19,45 @@ async def register_event_handlers(event_bus: EventBus) -> None:
     """
 
     async def handle_video_uploaded(event_data: Dict[str, Any]) -> None:
-        """
-        Handles video_uploaded events by triggering transcription processing.
+        """Handles VideoUploaded events by triggering transcription processing."""
+        try:
+            video_id = event_data["video_id"]
+            logger.info(f"Received VideoUploaded event for video {video_id}")
+            # A task de transcrição é despachada sem linguagem, usando o padrão.
+            process_transcription_task.delay(video_id=video_id)
+            logger.info(f"Successfully dispatched transcription task for video {video_id}")
+        except KeyError as e:
+            logger.error(f"Missing required field in VideoUploaded event data: {e}")
+        except Exception as e:
+            logger.error(f"Failed to handle VideoUploaded event: {e}", exc_info=True)
 
-        Args:
-            event_data: Dictionary containing event data with keys:
-                      - video_id: UUID of the uploaded video
-                      - file_path: Path to the video file (optional)
-                      - user_id: ID of the uploading user (optional)
+    async def handle_summary_requested(event_data: Dict[str, Any]) -> None:
+        """
+        Handles SummaryRequested events by triggering transcription processing.
         """
         try:
             video_id = event_data["video_id"]
-            logger.info(f"Received video_uploaded event for video {video_id}")
+            language = event_data.get("language", "en") # Pega a linguagem do evento
+            logger.info(f"Received SummaryRequested event for video {video_id}")
 
-            if not video_id:
-                raise ValueError("Missing required video_id in event data")
-
-            # Dispatch transcription task asynchronously (via Celery)
-            process_transcription_task.delay(video_id)
-            logger.info(f"Successfully dispatched transcription task for video {video_id}")
+            # Despacha a tarefa de transcrição com a linguagem especificada.
+            process_transcription_task.delay(video_id=video_id, language=language)
+            logger.info(f"Dispatched transcription task for {video_id} with language '{language}'.")
 
         except KeyError as e:
-            logger.error(f"Missing required field in event data: {e}")
+            logger.error(f"Missing required field in SummaryRequested event data: {e}")
         except Exception as e:
-            logger.error(f"Failed to handle video_uploaded event: {e}", exc_info=True)
+            logger.error(f"Failed to handle SummaryRequested event: {e}", exc_info=True)
 
     try:
-        event_bus.subscribe("video_uploaded", handle_video_uploaded)
-        logger.info("Successfully registered video_uploaded handler")
+        # Assinatura atualizada para usar o evento de domínio tipado
+        event_bus.subscribe(VideoUploaded, handle_video_uploaded)
+        logger.info("Successfully registered VideoUploaded handler")
+
+        # Assinatura para o evento de solicitação de resumo
+        event_bus.subscribe(SummaryRequested, handle_summary_requested)
+        logger.info("Successfully registered SummaryRequested handler")
+
     except Exception as e:
         logger.error(f"Failed to register event handlers: {e}", exc_info=True)
         raise

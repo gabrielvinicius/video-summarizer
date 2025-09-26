@@ -2,10 +2,12 @@
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+
+from src.summarization.domain.interfaces import ISummaryRepository
 from src.summarization.domain.summary import Summary
 
 
-class SummaryRepository:
+class SummaryRepository(ISummaryRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
