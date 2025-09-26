@@ -5,6 +5,9 @@ import asyncio
 import redis.asyncio as aioredis
 import logging
 
+# OpenTelemetry Imports
+from opentelemetry.instrumentation.celery import CeleryInstrumentor
+
 from src.shared.config.broker_settings import BrokerSettings
 from src.shared.events.domain_events import DomainEvent
 
@@ -12,7 +15,7 @@ from src.shared.events.domain_events import DomainEvent
 settings = BrokerSettings()
 logger = logging.getLogger(__name__)
 
-# Celery (kept for async tasks)
+# Celery
 celery = Celery(__name__, broker=settings.redis_url)
 celery.conf.task_serializer = 'json'
 celery.conf.result_serializer = 'json'
@@ -22,6 +25,10 @@ celery.autodiscover_tasks([
     "src.summarization.tasks",
     "src.notifications.tasks",
 ])
+
+# Instrument Celery with OpenTelemetry
+CeleryInstrumentor().instrument()
+
 
 # Redis async client
 redis_client = aioredis.Redis(

@@ -20,6 +20,15 @@ uvicorn>=0.34.2
 # intel-extension-for-pytorch==2.7.10+xpu
 torch>=2.8.0
 numba>=0.61.2
-# Observabilidade
+
+# Observability
 structlog>=24.4.0
 prometheus-client>=0.21.0
+
+# OpenTelemetry for Distributed Tracing
+opentelemetry-api>=1.25.0
+opentelemetry-sdk>=1.25.0
+opentelemetry-exporter-jaeger>=1.25.0
+opentelemetry-instrumentation-fastapi>=0.46.0
+opentelemetry-instrumentation-celery>=0.46.0
+opentelemetry-instrumentation-sqlalchemy>=0.46.0
