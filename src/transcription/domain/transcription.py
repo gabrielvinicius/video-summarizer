@@ -22,6 +22,7 @@ class Transcription(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     processed_at = Column(DateTime, nullable=True)
     error_message = Column(String, nullable=True)
+    provider = Column(String, nullable=True)  # Added provider field, nullable for now
 
     def mark_as_completed(self, text: str):
         self.text = text

@@ -13,7 +13,8 @@ from src.video_management.application.dependencies import get_video_service
 from src.video_management.infrastructure.dependencies import get_video_repository
 
 # Storage
-from src.storage.infrastructure.dependencies import get_storage_service
+# Import the factory getter instead of the service getter
+from src.storage.infrastructure.dependencies import get_storage_service_factory
 
 # Transcription
 from src.transcription.application.dependencies import get_transcription_service
@@ -49,18 +50,18 @@ class ApplicationContainer:
         """Initializes all services and dependencies."""
         # Shared services
         self._services["event_bus"] = get_event_bus()
-        self._services["storage_service"] = await get_storage_service()
+        # Store the factory, not an instance
+        self._services["storage_service_factory"] = get_storage_service_factory()
 
         # Setup services per context
         self._setup_metrics_services()
         self._setup_analytics_services(db_session)
         self._setup_auth_services(db_session)
-        self._setup_notification_services(db_session) # Added notification setup
+        self._setup_notification_services(db_session)
         await self._setup_video_services(db_session)
         await self._setup_transcription_services(db_session)
         await self._setup_summarization_services(db_session)
 
-        # Register event handlers after all services are initialized
         await self._register_event_handlers()
 
     def _setup_metrics_services(self) -> None:
@@ -76,36 +77,26 @@ class ApplicationContainer:
         self._services["auth_service"] = AuthService(user_repository=self._services["user_repository"])
 
     def _setup_notification_services(self, db_session: AsyncSession) -> None:
-        """Configures notification services."""
         smtp_settings = SmtpSettings()
-        self._services["email_adapter"] = SMTPAdapter(
-            host=smtp_settings.smtp_host,
-            port=smtp_settings.smtp_port,
-            username=smtp_settings.smtp_user,
-            password=smtp_settings.smtp_password
-        )
-        self._services["sms_adapter"] = SmsAdapter() # Placeholder
-        self._services["webhook_adapter"] = WebhookAdapter() # Placeholder
+        self._services["email_adapter"] = SMTPAdapter(host=smtp_settings.smtp_host, port=smtp_settings.smtp_port, username=smtp_settings.smtp_user, password=smtp_settings.smtp_password)
+        self._services["sms_adapter"] = SmsAdapter()
+        self._services["webhook_adapter"] = WebhookAdapter()
         self._services["notification_repository"] = NotificationRepository(db=db_session)
-        self._services["notification_service"] = NotificationService(
-            email_adapter=self._services["email_adapter"],
-            sms_adapter=self._services["sms_adapter"],
-            webhook_adapter=self._services["webhook_adapter"],
-            notification_repository=self._services["notification_repository"],
-            user_repository=self._services["user_repository"]
-        )
+        self._services["notification_service"] = NotificationService(email_adapter=self._services["email_adapter"], sms_adapter=self._services["sms_adapter"], webhook_adapter=self._services["webhook_adapter"], notification_repository=self._services["notification_repository"], user_repository=self._services["user_repository"])
 
     async def _setup_video_services(self, db_session: AsyncSession) -> None:
         self._services["video_repository"] = await get_video_repository(db_session)
-        self._services["video_service"] = await get_video_service(db_session)
+        # The video_service now needs the factory
+        self._services["video_service"] = await get_video_service(db_session, storage_service_factory=self._services["storage_service_factory"])
 
     async def _setup_transcription_services(self, db_session: AsyncSession) -> None:
         self._services["transcription_repository"] = await get_transcription_repository(db_session)
         self._services["speech_recognizer"] = await get_speech_recognition()
+        # The transcription_service also needs the factory
         self._services["transcription_service"] = await get_transcription_service(
-            event_bus=self._services["event_bus"],
-            storage_service=self._services["storage_service"],
             db=db_session,
+            event_bus=self._services["event_bus"],
+            storage_service_factory=self._services["storage_service_factory"],
             speech_recognition=self._services["speech_recognizer"]
         )
 
@@ -113,14 +104,7 @@ class ApplicationContainer:
         summary_repo = SummaryRepository(db_session)
         self._services["summary_repository"] = summary_repo
         self._services["summarizer"] = HuggingFaceSummarizer()
-        self._services["summarization_service"] = SummarizationService(
-            summarizer=self._services["summarizer"],
-            summary_repo=summary_repo,
-            transcription_service=self._services["transcription_service"],
-            metrics_service=self._services["metrics_service"],
-            analytics_service=self._services["analytics_service"],
-            event_bus=self._services["event_bus"]
-        )
+        self._services["summarization_service"] = SummarizationService(summarizer=self._services["summarizer"], summary_repo=summary_repo, transcription_service=self._services["transcription_service"], metrics_service=self._services["metrics_service"], analytics_service=self._services["analytics_service"], event_bus=self._services["event_bus"])
 
     async def _register_event_handlers(self) -> None:
         from src.transcription.application.event_handlers import register_event_handlers as register_transcription_handlers

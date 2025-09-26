@@ -10,10 +10,12 @@ from transformers import pipeline
 import logging
 
 from src.transcription.infrastructure.interfaces import ISpeechRecognition
+from src.transcription.infrastructure.dependencies import register_speech_recognition
 
 logger = logging.getLogger(__name__)
 
 
+@register_speech_recognition("huggingface")
 class HuggingfaceTranscriber(ISpeechRecognition):
     def __init__(self, model_name: str = "openai/whisper-base"):
         self.model = pipeline(task="automatic-speech-recognition",model=model_name)

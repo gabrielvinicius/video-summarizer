@@ -13,6 +13,7 @@ from src.summarization.api.routers import router as summary_router
 from src.notifications.api.routers import router as notification_router
 from src.transcription.api.routers import router as transcription_router
 from src.metrics.api.routers import router as metrics_router
+from src.providers.api.routers import router as providers_router # Added providers router
 
 # Import container and database dependencies
 from src.shared.container import build_container, ApplicationContainer
@@ -34,38 +35,36 @@ REQUEST_LATENCY = Histogram(
 VIDEO_UPLOADS_TOTAL = Counter(
     'video_uploads_total',
     'Total videos uploaded',
-    ['status']  # status: success, failure
+    ['status']
 )
 
 TRANSCRIPTIONS_TOTAL = Counter(
     'transcriptions_total',
     'Total transcriptions processed',
-    ['status']  # status: success, failure
+    ['status']
 )
 
 SUMMARIZATIONS_TOTAL = Counter(
     'summarizations_total',
     'Total summaries generated',
-    ['status']  # status: success, failure
+    ['status']
 )
 
 # --- Processing Duration Histograms ---
-TRANSCRIPTION_DURATION = Histogram(
-    'transcription_duration_seconds',
-    'Transcription processing time per video',
-    ['video_id']
-)
-
-SUMMARIZATION_DURATION = Histogram(
-    'summarization_duration_seconds',
-    'Summarization processing time per video',
-    ['video_id']
-)
-
 UPLOAD_DURATION = Histogram(
     'upload_duration_seconds',
     'Upload processing time per video',
-    ['video_id']
+    ['video_id', 'provider']
+)
+TRANSCRIPTION_DURATION = Histogram(
+    'transcription_duration_seconds',
+    'Transcription processing time per video',
+    ['video_id', 'provider']
+)
+SUMMARIZATION_DURATION = Histogram(
+    'summarization_duration_seconds',
+    'Summarization processing time per video',
+    ['video_id', 'provider']
 )
 
 # --- System State Gauges ---
@@ -77,24 +76,20 @@ ACTIVE_PROCESSES = Gauge(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create database tables
     print("⏳ Creating database tables...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Initialize dependency container
     print("⚙️ Initializing dependency container...")
     async with AsyncSessionLocal() as session:
         container = await build_container(session)
         app.state.container = container
 
-        # Start the event bus listener
         print("🚀 Starting event bus...")
         await container["event_bus"].start_listener()
 
         yield
 
-        # Clean up resources on shutdown
         print("🛑 Shutting down resources...")
         await container.dispose()
         await engine.dispose()
@@ -110,23 +105,32 @@ app = FastAPI(
 )
 
 
-# --- Metrics Middleware ---
+# --- Middlewares ---
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
     latency = time.time() - start_time
-
     REQUEST_COUNT.labels(method=request.method, endpoint=request.url.path, status_code=response.status_code).inc()
     REQUEST_LATENCY.labels(method=request.method, endpoint=request.url.path).observe(latency)
+    return response
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"📥 Request received: {request.method} {request.url}")
+    response = await call_next(request)
+    print(f"📤 Responding: {response.status_code}")
     return response
 
 
-# --- Metrics Endpoint ---
+# --- Endpoints ---
 @app.get("/metrics")
 async def get_metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+@app.get("/health", tags=["System"])
+async def health_check():
+    return {"status": "healthy"}
 
 
 # --- Dependency Injection Helper ---
@@ -137,71 +141,15 @@ def get_service(service_name: str):
 
 
 # --- Route Registration ---
-app.include_router(
-    transcription_router,
-    tags=["Transcriptions"],
-    dependencies=[Depends(get_service("transcription_service"))]
-)
-app.include_router(
-    summary_router,
-    tags=["Summaries"],
-    dependencies=[Depends(get_service("summarization_service"))]
-)
-app.include_router(
-    notification_router,
-    tags=["Notifications"],
-    dependencies=[Depends(get_service("event_bus"))]
-)
-app.include_router(
-    auth_router,
-    tags=["Authentication"],
-    dependencies=[Depends(get_service("event_bus"))]
-)
-app.include_router(
-    video_router,
-    tags=["Videos"],
-    dependencies=[Depends(get_service("event_bus"))]
-)
-app.include_router(
-    metrics_router,
-    prefix="/metrics",
-    tags=["Metrics"]
-)
-
-
-# --- Health Check Endpoint ---
-@app.get("/health", tags=["System"])
-async def health_check():
-    return {
-        "status": "healthy",
-        "services": [
-            "auth",
-            "videos",
-            "transcriptions",
-            "summarizations",
-            "notifications"
-        ]
-    }
-
-
-# --- Logging Middleware ---
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    print(f"📥 Request received: {request.method} {request.url}")
-    response = await call_next(request)
-    print(f"📤 Responding: {response.status_code}")
-    return response
+app.include_router(providers_router)
+app.include_router(auth_router)
+app.include_router(video_router)
+app.include_router(transcription_router)
+app.include_router(summary_router)
+app.include_router(notification_router)
+app.include_router(metrics_router)
 
 
 if __name__ == "__main__":
     import uvicorn
-
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        workers=4,
-        log_level="info",
-        access_log=True
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, workers=4, log_level="info", access_log=True)

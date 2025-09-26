@@ -10,7 +10,7 @@ import uuid
 
 
 class SummaryStatus(str, enum.Enum):
-    PENDING = "PENDING"  # Novo estado inicial
+    PENDING = "PENDING"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
@@ -26,18 +26,19 @@ class Summary(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     processed_at = Column(DateTime, nullable=True)
     error_message = Column(String, nullable=True)
+    provider = Column(String, nullable=True)  # Added provider field
 
     @staticmethod
-    def create(transcription_id: str) -> "Summary":
+    def create(transcription_id: str, provider: str) -> "Summary":
         """Factory method to create a new summary in a valid initial state."""
-        summary = Summary(transcription_id=transcription_id)
-        summary.status = SummaryStatus.PROCESSING  # Define o estado inicial como PROCESSING
+        summary = Summary(transcription_id=transcription_id, provider=provider)
+        summary.status = SummaryStatus.PROCESSING
         summary.created_at = datetime.utcnow()
         return summary
 
     def mark_as_completed(self, content: str):
         if self.status == SummaryStatus.COMPLETED:
-            return  # Evita reprocessamento
+            return  # Avoid reprocessing
         self.text = content
         self.status = SummaryStatus.COMPLETED
         self.processed_at = datetime.utcnow()

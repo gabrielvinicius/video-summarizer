@@ -5,10 +5,12 @@ import logging
 from faster_whisper import WhisperModel
 
 from src.transcription.infrastructure.interfaces import ISpeechRecognition
+from src.transcription.infrastructure.dependencies import register_speech_recognition
 
 logger = logging.getLogger(__name__)
 
 
+@register_speech_recognition("fastwhisper")
 class FastWhisperTranscriber(ISpeechRecognition):
     def __init__(
             self,

@@ -4,8 +4,10 @@ import asyncio
 from threading import Lock
 
 from src.summarization.infrastructure.interfaces import ISummarizer
+from src.summarization.infrastructure.dependencies import register_summarizer
 
 
+@register_summarizer("huggingface")
 class HuggingFaceSummarizer(ISummarizer):
     def __init__(self, model_name="google-t5/t5-base"):
         """

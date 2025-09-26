@@ -24,6 +24,12 @@ class VideoUploaded(DomainEvent):
 # --- Transcription Events ---
 
 @dataclass(frozen=True)
+class TranscriptionRequested(DomainEvent):
+    """Event triggered when a transcription is explicitly requested for a video."""
+    video_id: str
+    provider: str
+
+@dataclass(frozen=True)
 class TranscriptionStarted(DomainEvent):
     video_id: str
 
@@ -41,11 +47,10 @@ class TranscriptionFailed(DomainEvent):
 # --- Summarization Events ---
 
 @dataclass(frozen=True)
-class SummaryRequested(DomainEvent):
+class SummarizationRequested(DomainEvent):
     """Event triggered when a user requests a new summary."""
-    video_id: str
-    user_id: str
-    language: str
+    transcription_id: str
+    provider: str
 
 
 @dataclass(frozen=True)

@@ -33,9 +33,9 @@ class TranscriptionService:
         self.video_service = video_service
         self.metrics_service = metrics_service
 
-    async def process_transcription(self, video_id: str, language: str = "en") -> Transcription:
+    async def process_transcription(self, video_id: str, provider: str, language: str = "en") -> Transcription:
         start_time = time.time()
-        logger.info("transcription.started", video_id=video_id, language=language)
+        logger.info("transcription.started", video_id=video_id, provider=provider, language=language)
 
         transcription = await self.transcription_repo.find_by_video_id(video_id)
 
@@ -44,30 +44,26 @@ class TranscriptionService:
 
             if transcription and transcription.text and transcription.status == TranscriptionStatus.COMPLETED:
                 logger.info("transcription.completed", video_id=video_id, from_cache=True)
-                await self.event_bus.publish(TranscriptionCompleted(
-                    video_id=transcription.video_id,
-                    transcription_id=str(transcription.id)
-                ))
+                await self.event_bus.publish(TranscriptionCompleted(video_id=transcription.video_id, transcription_id=str(transcription.id)))
                 return transcription
 
             if transcription is None:
-                transcription = Transcription(video_id=video_id, status=TranscriptionStatus.PROCESSING)
-                await self.transcription_repo.save(transcription)
+                transcription = Transcription(video_id=video_id, status=TranscriptionStatus.PROCESSING, provider=provider)
+            else:
+                transcription.provider = provider # Update provider if reprocessing
+            
+            await self.transcription_repo.save(transcription)
 
-            audio_bytes = await self._download_audio(transcription.video_id)
+            audio_bytes = await self._download_audio(video_id)
             text = await self.speech_recognition.transcribe(audio_bytes, language=language)
 
             transcription.mark_as_completed(text)
             await self.transcription_repo.save(transcription)
 
-            await self.event_bus.publish(TranscriptionCompleted(
-                video_id=video_id,
-                transcription_id=str(transcription.id)
-            ))
+            await self.event_bus.publish(TranscriptionCompleted(video_id=video_id, transcription_id=str(transcription.id)))
 
             duration = time.time() - start_time
             self.metrics_service.increment_transcription('success')
-            # Observe metrics with the provider label
             self.metrics_service.observe_transcription_duration(
                 video_id=video_id, 
                 duration=duration, 
@@ -94,6 +90,7 @@ class TranscriptionService:
         if not video:
             raise ValueError(f"Video with id {video_id} not found.")
         try:
+            # The correct storage service instance is passed during TranscriptionService initialization in the Celery task
             content, _ = await self.storage_service.download(video.file_path)
             return content
         except Exception as e:

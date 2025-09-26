@@ -5,7 +5,7 @@ import structlog
 
 from src.analytics.application.analytics_service import AnalyticsService
 from src.metrics.application.metrics_service import MetricsService
-from src.shared.events.domain_events import SummaryRequested, SummarizationProgress
+from src.shared.events.domain_events import SummarizationRequested, SummarizationProgress
 from src.shared.events.event_bus import EventBus
 from src.summarization.domain.interfaces import ISummaryRepository
 from src.summarization.domain.summary import Summary, SummaryStatus
@@ -32,19 +32,15 @@ class SummarizationService:
         self.analytics_service = analytics_service
         self.event_bus = event_bus
 
-    async def request_summary(self, video_id: str, user_id: str, language: str):
+    async def request_summary(self, transcription_id: str, provider: str):
         """Dispatches a typed domain event to request a video summary."""
-        logger.info("summary.requested", video_id=video_id, user_id=user_id, language=language)
-        event = SummaryRequested(
-            video_id=video_id,
-            user_id=user_id,
-            language=language
-        )
+        logger.info("summary.requested", transcription_id=transcription_id, provider=provider)
+        event = SummarizationRequested(transcription_id=transcription_id, provider=provider)
         await self.event_bus.publish(event)
 
-    async def process_summary(self, transcription_id: str) -> Summary:
+    async def process_summary(self, transcription_id: str, provider: str) -> Summary:
         start_time = time.time()
-        logger.info("summarization.started", transcription_id=transcription_id)
+        logger.info("summarization.started", transcription_id=transcription_id, provider=provider)
 
         summary = await self.summary_repo.find_by_transcription_id(transcription_id)
         if summary and summary.status == SummaryStatus.COMPLETED:
@@ -52,11 +48,14 @@ class SummarizationService:
             return summary
 
         if not summary:
-            summary = Summary.create(transcription_id=transcription_id)
-            await self.summary_repo.save(summary)
+            summary = Summary.create(transcription_id=transcription_id, provider=provider)
+        else:
+            summary.provider = provider # Update provider if reprocessing
+        
+        await self.summary_repo.save(summary)
 
         try:
-            transcription = await self.transcription_service.get_transcription_by_id(transcription_id=transcription_id)
+            transcription = await self.transcription_service.get_transcription_by_id(transcription_id)
             if not transcription or not transcription.text:
                 raise ValueError("Transcription not found or has no text")
 
@@ -83,7 +82,6 @@ class SummarizationService:
 
             duration = time.time() - start_time
             self.metrics_service.increment_summarization('success')
-            # Observe metrics with the provider label
             self.metrics_service.observe_summarization_duration(
                 transcription_id=transcription_id, 
                 duration=duration, 
