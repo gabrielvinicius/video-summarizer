@@ -1,96 +1,36 @@
-import time
-from typing import Optional, Sequence
-from uuid import uuid4, UUID
-
+# src/video_management/application/video_service.py
+from typing import Optional
+from uuid import UUID
 import structlog
 
-from src.metrics.application.metrics_service import MetricsService
-from src.shared.events.domain_events import VideoUploaded
-from src.shared.events.event_bus import EventBus
 from src.storage.infrastructure.dependencies import StorageServiceFactory
 from src.video_management.domain.video import Video, VideoStatus
 from src.video_management.infrastructure.video_repository import VideoRepository
+# CQRS imports
+from .commands.upload_video_command import UploadVideoCommand
+from .commands.upload_video_command_handler import UploadVideoCommandHandler
 
 logger = structlog.get_logger(__name__)
 
 
 class VideoService:
+    """Acts as a facade for video-related operations, dispatching commands."""
     def __init__(
-            self,
-            storage_service_factory: StorageServiceFactory,
-            event_bus: EventBus,
-            video_repository: VideoRepository,
-            metrics_service: MetricsService,
+        self,
+        upload_video_handler: UploadVideoCommandHandler,
+        video_repository: VideoRepository, # Still needed for mixed operations
+        storage_service_factory: StorageServiceFactory, # Still needed for mixed operations
     ):
-        self.storage_service_factory = storage_service_factory
-        self.event_bus = event_bus
+        self.upload_video_handler = upload_video_handler
         self.video_repository = video_repository
-        self.metrics_service = metrics_service
+        self.storage_service_factory = storage_service_factory
 
-    async def upload_video(self, user_id: str, file: bytes, filename: str, storage_provider: str) -> Video:
-        start_time = time.time()
-        video_id = uuid4()
-        storage_service = self.storage_service_factory(storage_provider)
+    # --- Command Dispatcher ---
+    async def create_video(self, command: UploadVideoCommand) -> Video:
+        """Dispatches the UploadVideoCommand to its handler."""
+        return await self.upload_video_handler.handle(command)
 
-        try:
-            file_path = f"videos/{user_id}/{video_id}/{filename}"
-            logger.info("video_upload.started", video_id=str(video_id), provider=storage_provider)
-
-            await storage_service.upload(file_path, file)
-
-            video = Video(
-                id=video_id,
-                user_id=user_id,
-                file_path=file_path,
-                status=VideoStatus.UPLOADED,
-                storage_provider=storage_provider
-            )
-            saved_video = await self.video_repository.save(video)
-
-            event = VideoUploaded(video_id=str(video_id), user_id=user_id)
-            await self.event_bus.publish(event)
-
-            duration = time.time() - start_time
-            logger.info("video_upload.completed", video_id=str(video_id), duration=duration)
-
-            self.metrics_service.increment_video_upload('success')
-            self.metrics_service.observe_upload_duration(
-                video_id=str(video_id),
-                duration=duration,
-                provider=storage_service.provider_name
-            )
-
-            return saved_video
-
-        except Exception as e:
-            self.metrics_service.increment_video_upload('failure')
-            logger.error("video_upload.failed", video_id=str(video_id), error=str(e))
-            if 'file_path' in locals():
-                try:
-                    await storage_service.delete(file_path)
-                except Exception as cleanup_error:
-                    logger.error("video_upload.cleanup_failed", video_id=str(video_id), error=str(cleanup_error))
-            raise ValueError(f"Video upload failed: {str(e)}") from e
-
-    async def get_video_by_id(self, video_id: str) -> Optional[Video]:
-        return await self.video_repository.find_by_id(UUID(video_id))
-
-    async def get_video_by_user_by_id(self, video_id: str, user_id: str) -> Optional[Video]:
-        return await self.video_repository.find_by_id_by_user(video_id=UUID(video_id), user_id=UUID(user_id))
-
-    async def list_all_videos(self, skip: int = 0, limit: int = 100) -> Sequence[Video]:
-        return await self.video_repository.list_all(skip, limit)
-
-    async def list_user_videos(self, user_id: str, skip=0, limit=100) -> Sequence[Video]:
-        return await self.video_repository.list_by_user(UUID(user_id))
-
-    async def update_video_status(self, video_id: str, status: VideoStatus) -> Optional[Video]:
-        video = await self.video_repository.find_by_id(UUID(video_id))
-        if not video:
-            return None
-        video.status = status
-        return await self.video_repository.save(video)
-
+    # --- Mixed Command/Query Methods (To be refactored) ---
     async def delete_video(self, video_id: str) -> bool:
         video = await self.video_repository.find_by_id(UUID(video_id))
         if not video:
@@ -99,12 +39,14 @@ class VideoService:
             storage_service = self.storage_service_factory(video.storage_provider)
             await storage_service.delete(video.file_path)
         except Exception as e:
-            logger.error(f"Failed to delete video file: {str(e)}")
+            logger.error(f"Failed to delete video file from storage: {str(e)}")
         return await self.video_repository.delete(UUID(video_id))
 
     async def get_video_streaming_url(self, video_id: str) -> Optional[str]:
-        video = await self.get_video_by_id(video_id)
-        if not video or video.status != VideoStatus.COMPLETED:
+        # This method reads data to create the URL, so it's query-like.
+        # It will be moved to VideoQueries in a future refactoring.
+        video = await self.video_repository.find_by_id(UUID(video_id))
+        if not video or not video.storage_provider:
             return None
         try:
             storage_service = self.storage_service_factory(video.storage_provider)

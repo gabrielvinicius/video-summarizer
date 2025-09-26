@@ -7,7 +7,7 @@ from src.shared.infrastructure.database import AsyncSessionLocal
 
 
 async def get_db_session() -> AsyncGenerator[Any, Any]:
-    async with AsyncSessionLocal as session:
+    async with AsyncSessionLocal() as session:
         yield session
 
 
@@ -25,6 +25,13 @@ def get_service(service_name: str):
 
 
 # Specific service dependencies for route injection
-get_summarization_service = get_service("summarization_service")
 get_auth_service = get_service("auth_service")
-get_notification_service = get_service("notification_service") # Added notification service getter
+get_notification_service = get_service("notification_service")
+
+# Video
+get_video_service = get_service("video_service") # For Commands
+get_video_queries = get_service("video_queries") # For Queries
+
+# Summarization
+get_summarization_service = get_service("summarization_service") # For Commands
+get_summary_queries = get_service("summary_queries") # For Queries

@@ -1,13 +1,12 @@
 import asyncio
 from celery import shared_task
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure.database import get_db
-from src.summarization.application.summarization_service import SummarizationService
+# Import the new CQRS components
+from src.summarization.application.commands.process_summary_command import ProcessSummaryCommand
+from src.summarization.application.commands.process_summary_command_handler import ProcessSummaryCommandHandler
 from src.summarization.infrastructure.dependencies import create_summarizer_service
-from src.summarization.infrastructure.summary_repository import SummaryRepository
-from src.transcription.application.transcription_service import TranscriptionService
-# Import other necessary dependencies manually for the Celery context
+# Import the container to help build dependencies
 from src.shared.container import ApplicationContainer
 
 
@@ -18,14 +17,15 @@ def process_summary_task(self, transcription_id: str, provider: str):
     """
     async def run():
         async for db_session in get_db():
-            # Manually build the service with the dynamic provider
+            # Manually build dependencies required for the handler
             container = ApplicationContainer()
-            # We need to initialize parts of the container manually to get dependencies
             await container.initialize(db_session)
 
+            # 1. Create the specific summarizer instance using the factory
             summarizer_instance = create_summarizer_service(provider)
             
-            summarization_service = SummarizationService(
+            # 2. Create the command handler with all its dependencies
+            handler = ProcessSummaryCommandHandler(
                 summarizer=summarizer_instance,
                 summary_repo=container["summary_repository"],
                 transcription_service=container["transcription_service"],
@@ -34,6 +34,13 @@ def process_summary_task(self, transcription_id: str, provider: str):
                 event_bus=container["event_bus"]
             )
             
-            await summarization_service.process_summary(transcription_id, provider=provider)
+            # 3. Create the command object
+            command = ProcessSummaryCommand(
+                transcription_id=transcription_id,
+                provider=provider
+            )
+
+            # 4. Execute the handler
+            await handler.handle(command)
 
     asyncio.run(run())

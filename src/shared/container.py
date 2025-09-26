@@ -9,20 +9,22 @@ from src.auth.application.auth_service import AuthService
 from src.auth.infrastructure.user_repository import UserRepository
 
 # Video
-from src.video_management.application.dependencies import get_video_service
+from src.video_management.application.video_service import VideoService
+from src.video_management.application.commands.upload_video_command_handler import UploadVideoCommandHandler
+from src.video_management.application.queries.video_queries import VideoQueries
 from src.video_management.infrastructure.dependencies import get_video_repository
 
 # Storage
-# Import the factory getter instead of the service getter
 from src.storage.infrastructure.dependencies import get_storage_service_factory
 
 # Transcription
 from src.transcription.application.dependencies import get_transcription_service
-from src.transcription.infrastructure.dependencies import get_speech_recognition, get_transcription_repository
+from src.transcription.infrastructure.dependencies import get_speech_recognition_service_factory, get_transcription_repository
 
 # Summarization
 from src.summarization.application.summarization_service import SummarizationService
-from src.summarization.infrastructure.huggingface_summarizer import HuggingFaceSummarizer
+from src.summarization.application.queries.summary_queries import SummaryQueries
+from src.summarization.infrastructure.dependencies import get_summarizer_service_factory
 from src.summarization.infrastructure.summary_repository import SummaryRepository
 
 # Analytics
@@ -48,12 +50,11 @@ class ApplicationContainer:
 
     async def initialize(self, db_session: AsyncSession) -> None:
         """Initializes all services and dependencies."""
-        # Shared services
         self._services["event_bus"] = get_event_bus()
-        # Store the factory, not an instance
         self._services["storage_service_factory"] = get_storage_service_factory()
+        self._services["speech_recognition_service_factory"] = get_speech_recognition_service_factory()
+        self._services["summarizer_service_factory"] = get_summarizer_service_factory()
 
-        # Setup services per context
         self._setup_metrics_services()
         self._setup_analytics_services(db_session)
         self._setup_auth_services(db_session)
@@ -86,25 +87,21 @@ class ApplicationContainer:
 
     async def _setup_video_services(self, db_session: AsyncSession) -> None:
         self._services["video_repository"] = await get_video_repository(db_session)
-        # The video_service now needs the factory
-        self._services["video_service"] = await get_video_service(db_session, storage_service_factory=self._services["storage_service_factory"])
+        upload_video_handler = UploadVideoCommandHandler(storage_service_factory=self._services["storage_service_factory"], event_bus=self._services["event_bus"], video_repository=self._services["video_repository"], metrics_service=self._services["metrics_service"])
+        self._services["upload_video_handler"] = upload_video_handler
+        video_service = VideoService(upload_video_handler=upload_video_handler, video_repository=self._services["video_repository"], storage_service_factory=self._services["storage_service_factory"])
+        self._services["video_service"] = video_service
+        self._services["video_queries"] = VideoQueries(video_repository=self._services["video_repository"])
 
     async def _setup_transcription_services(self, db_session: AsyncSession) -> None:
         self._services["transcription_repository"] = await get_transcription_repository(db_session)
-        self._services["speech_recognizer"] = await get_speech_recognition()
-        # The transcription_service also needs the factory
-        self._services["transcription_service"] = await get_transcription_service(
-            db=db_session,
-            event_bus=self._services["event_bus"],
-            storage_service_factory=self._services["storage_service_factory"],
-            speech_recognition=self._services["speech_recognizer"]
-        )
+        self._services["transcription_service"] = await get_transcription_service(db=db_session, event_bus=self._services["event_bus"], storage_service_factory=self._services["storage_service_factory"], speech_recognition_service_factory=self._services["speech_recognition_service_factory"])
 
     async def _setup_summarization_services(self, db_session: AsyncSession) -> None:
-        summary_repo = SummaryRepository(db_session)
-        self._services["summary_repository"] = summary_repo
-        self._services["summarizer"] = HuggingFaceSummarizer()
-        self._services["summarization_service"] = SummarizationService(summarizer=self._services["summarizer"], summary_repo=summary_repo, transcription_service=self._services["transcription_service"], metrics_service=self._services["metrics_service"], analytics_service=self._services["analytics_service"], event_bus=self._services["event_bus"])
+        """Configures summarization-related services and query handlers."""
+        self._services["summary_repository"] = SummaryRepository(db_session)
+        self._services["summary_queries"] = SummaryQueries(summary_repository=self._services["summary_repository"])
+        self._services["summarization_service"] = SummarizationService(event_bus=self._services["event_bus"])
 
     async def _register_event_handlers(self) -> None:
         from src.transcription.application.event_handlers import register_event_handlers as register_transcription_handlers
