@@ -1,16 +1,26 @@
-import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, Request, Response
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 # OpenTelemetry Imports
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from src.shared.infrastructure.tracing import configure_tracer
 
 # --- Module Bootstrapping and Composition Root ---
-from src.auth.dependencies import bootstrap_auth_module
-from src.shared.container import build_container
+from src.auth.bootstrap import bootstrap_auth_module
+from src.video_management.bootstrap import bootstrap_video_module
+from src.transcription.bootstrap import bootstrap_transcription_module
+from src.summarization.bootstrap import bootstrap_summarization_module
+from src.notifications.bootstrap import bootstrap_notification_module
+from src.analytics.bootstrap import bootstrap_analytics_module
+from src.metrics.bootstrap import bootstrap_metrics_module
+
+# Shared Factories and DB
+from src.shared.events.event_bus import get_event_bus
+from src.storage.infrastructure.dependencies import get_storage_service_factory
+from src.transcription.infrastructure.dependencies import get_speech_recognition_service_factory
+from src.summarization.infrastructure.dependencies import get_summarizer_service_factory
 from src.shared.infrastructure.database import Base, engine, AsyncSessionLocal
 
 # API Routers
@@ -21,11 +31,6 @@ from src.providers.api.routers import router as providers_router
 from src.summarization.api.routers import router as summary_router
 from src.transcription.api.routers import router as transcription_router
 from src.video_management.api.routers import router as video_router
-
-
-# --- Prometheus Metrics ---
-REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP Requests', ['method', 'endpoint', 'status_code'])
-REQUEST_LATENCY = Histogram('http_request_duration_seconds', 'HTTP Request Latency', ['method', 'endpoint'])
 
 
 @asynccontextmanager
@@ -41,17 +46,34 @@ async def lifespan(app: FastAPI):
     # 3. Initialize Modules and Compose Application (Composition Root)
     print("⚙️ Initializing modules and composing application...")
     async with AsyncSessionLocal() as session:
-        # Bootstrap each module independently
-        auth_container = bootstrap_auth_module(session)
-        
-        # Build the main container, injecting cross-context dependencies explicitly
-        main_container = await build_container(session, user_repository=auth_container.user_repository)
+        # Create shared components first
+        event_bus = get_event_bus()
+        storage_factory = get_storage_service_factory()
+        speech_factory = get_speech_recognition_service_factory()
+        summarizer_factory = get_summarizer_service_factory()
 
-        # Create a unified container for the application state
+        # Bootstrap all modules, passing dependencies explicitly
+        metrics_components = bootstrap_metrics_module()
+        auth_components = bootstrap_auth_module(session)
+        analytics_components = bootstrap_analytics_module(session)
+        transcription_components = bootstrap_transcription_module(session)
+        notification_components = bootstrap_notification_module(session, user_repository=auth_components["user_repository"])
+        video_components = bootstrap_video_module(session, storage_factory, event_bus, metrics_components["metrics_service"])
+        summarization_components = bootstrap_summarization_module(session, event_bus)
+
+        # Create a unified container dictionary for the application state
         app.state.container = {
-            "auth_service": auth_container.service,
-            "auth_queries": auth_container.queries,
-            **main_container.services, # Add all other services
+            "event_bus": event_bus,
+            "storage_service_factory": storage_factory,
+            "speech_recognition_service_factory": speech_factory,
+            "summarizer_service_factory": summarizer_factory,
+            **metrics_components,
+            **auth_components,
+            **analytics_components,
+            **transcription_components,
+            **notification_components,
+            **video_components,
+            **summarization_components,
         }
 
         # 4. Start Background Services
@@ -75,20 +97,13 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Instrument the FastAPI app with OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
-
-
-# --- Middlewares & Endpoints ---
-# ... (Middlewares and other endpoints remain the same)
-
 
 # --- Dependency Injection Helper ---
 def get_service(service_name: str):
     async def _get_service(request: Request):
         return request.app.state.container[service_name]
     return _get_service
-
 
 # --- Route Registration ---
 app.include_router(providers_router)
@@ -98,8 +113,3 @@ app.include_router(transcription_router)
 app.include_router(summary_router)
 app.include_router(notification_router)
 app.include_router(metrics_router)
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, workers=4, log_level="info", access_log=True)
