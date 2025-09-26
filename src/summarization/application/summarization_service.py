@@ -1,31 +1,43 @@
 # src/summarization/application/summarization_service.py
 import time
 
-import structlog  # Nova importação para logging estruturado
+import structlog
 
-# Importar as métricas do main.py (ou de um módulo centralizado)
+from src.analytics.application.analytics_service import AnalyticsService
 from src.metrics.application.metrics_service import MetricsService
+from src.shared.events.event_bus import EventBus
 from src.summarization.domain.summary import Summary, SummaryStatus
 from src.summarization.infrastructure.interfaces import ISummarizer
 from src.summarization.infrastructure.summary_repository import SummaryRepository
 from src.transcription.application.transcription_service import TranscriptionService
-from src.analytics.application.analytics_service import AnalyticsService
 
-# Obtém um logger estruturado
 logger = structlog.get_logger(__name__)
 
+
 class SummarizationService:
-    def __init__(self, summarizer: ISummarizer, summary_repo: SummaryRepository,
+    def __init__(self,
+                 summarizer: ISummarizer,
+                 summary_repo: SummaryRepository,
                  transcription_service: TranscriptionService,
                  metrics_service: MetricsService,
                  analytics_service: AnalyticsService,
+                 event_bus: EventBus
                  ):
-
         self.summarizer = summarizer
         self.summary_repo = summary_repo
         self.transcription_service = transcription_service
         self.metrics_service = metrics_service
         self.analytics_service = analytics_service
+        self.event_bus = event_bus
+
+    async def request_summary(self, video_id: str, user_id: str, language: str):
+        """Dispatches an event to request a video summary."""
+        logger.info("summary.requested", video_id=video_id, user_id=user_id, language=language)
+        await self._publish_event("SummaryRequested", {
+            "video_id": video_id,
+            "user_id": user_id,
+            "language": language
+        })
 
     async def process_summary(self, transcription_id: str) -> Summary:
         start_time = time.time()
