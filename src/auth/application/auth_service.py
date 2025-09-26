@@ -3,7 +3,7 @@ from uuid import UUID
 from passlib.context import CryptContext
 from typing import Optional
 from src.auth.domain.user import User, UserRole
-from src.shared.config.auth_settings import AuthSettings
+from src.auth.config.settings import AuthSettings  # Importação corrigida
 from src.shared.utils.id_generator import generate_id
 from src.auth.infrastructure.user_repository import UserRepository
 from src.auth.utils.token import create_access_token as token_util_create, verify_token as token_util_verify

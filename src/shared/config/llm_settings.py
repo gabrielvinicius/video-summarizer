@@ -1,10 +1,2 @@
-from pydantic_settings import BaseSettings
-
-class LLMSettings(BaseSettings):
-    provider: str = "openai"  # openai | transformers
-    openai_api_key: str = ""
-    transformers_model: str = "facebook/bart-large-cnn"
-
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+# This file is deprecated and can be removed.
+# The LLMSettings class has been moved to src/summarization/config/settings.py

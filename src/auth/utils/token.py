@@ -4,7 +4,7 @@ from jose import jwt, JWTError
 from uuid import UUID
 from typing import Optional
 from src.auth.domain.user import User, UserRole
-from src.shared.config.auth_settings import AuthSettings
+from src.auth.config.settings import AuthSettings  # Importação corrigida
 
 settings = AuthSettings()
 
