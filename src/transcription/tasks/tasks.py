@@ -1,4 +1,5 @@
 import asyncio
+import structlog
 from celery import shared_task
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,11 +11,10 @@ from src.transcription.application.commands.process_transcription_command import
 from src.transcription.application.commands.process_transcription_command_handler import ProcessTranscriptionCommandHandler
 from src.transcription.infrastructure.dependencies import get_transcription_repository, create_speech_recognition_service
 # Import dependencies for manual construction
-from src.video_management.application.video_service import VideoService
+from src.video_management.application.queries.video_queries import VideoQueries
 from src.video_management.infrastructure.video_repository import VideoRepository
 from src.metrics.application.metrics_service import MetricsService
 from src.metrics.infrastructure.prometheus_provider import PrometheusMetricsProvider
-from src.video_management.application.commands.upload_video_command_handler import UploadVideoCommandHandler
 
 logger = structlog.get_logger(__name__)
 
@@ -37,18 +37,14 @@ async def _run_transcription(video_id: str, provider: str, language: str):
 
         # --- Manual Dependency Injection for Celery Task ---
         event_bus = get_event_bus()
-        metrics_provider = PrometheusMetricsProvider()
-        metrics_service = MetricsService(provider=metrics_provider)
+        metrics_service = MetricsService(provider=PrometheusMetricsProvider())
         storage_service_factory = get_storage_service_factory()
         
-        # The handler needs to fetch video data, so we build what's necessary
+        # The handler needs to read video data and write its updated state
         video_repository = VideoRepository(db=db_session)
-        # A minimal VideoService is needed for the handler's dependency
-        # This is a point for future refactoring to further decouple contexts
-        upload_handler = UploadVideoCommandHandler(storage_service_factory, event_bus, video_repository, metrics_service)
-        video_service = VideoService(upload_handler, video_repository, storage_service_factory)
+        video_queries = VideoQueries(video_repository=video_repository)
 
-        video = await video_service.get_video_by_id(video_id)
+        video = await video_queries.get_by_id(video_id)
         if not video:
             logger.error(f"Video {video_id} not found in transcription task.")
             return
@@ -64,7 +60,8 @@ async def _run_transcription(video_id: str, provider: str, language: str):
             storage_service=storage_service,
             event_bus=event_bus,
             transcription_repository=transcription_repository,
-            video_service=video_service,
+            video_queries=video_queries,
+            video_repository=video_repository,
             metrics_service=metrics_service
         )
         
