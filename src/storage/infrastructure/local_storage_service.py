@@ -15,42 +15,42 @@ class LocalStorageService(StorageService):
     async def upload(self, file_path: Union[str, Path], file: bytes) -> None:
         path = self.root / file_path
         try:
-            # Executa em thread separada
+            # Run in a separate thread
             await asyncio.to_thread(self._sync_upload, path, file)
         except Exception as e:
-            raise StorageException("Erro ao salvar localmente", e)
+            raise StorageException("Error saving file locally", e)
 
     def _sync_upload(self, path: Path, file: bytes):
-        """Implementação síncrona do upload"""
+        """Synchronous implementation of the upload."""
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(file)
 
     async def download(self, file_path: Union[str, Path]) -> Optional[bytes]:
         path = self.root / file_path
         try:
-            # Executa em thread separada
+            # Run in a separate thread
             return await asyncio.to_thread(self._sync_download, path)
         except FileNotFoundError:
             return None
         except Exception as e:
-            raise StorageException("Erro ao ler localmente", e)
+            raise StorageException("Error reading file locally", e)
 
     def _sync_download(self, path: Path) -> bytes:
-        """Implementação síncrona do download"""
+        """Synchronous implementation of the download."""
         return path.read_bytes()
 
     async def delete(self, file_path: Union[str, Path]) -> bool:
         path = self.root / file_path
         try:
-            # Executa em thread separada
+            # Run in a separate thread
             return await asyncio.to_thread(self._sync_delete, path)
         except FileNotFoundError:
             return False
         except Exception as e:
-            raise StorageException("Erro ao deletar localmente", e)
+            raise StorageException("Error deleting file locally", e)
 
     def _sync_delete(self, path: Path) -> bool:
-        """Implementação síncrona do delete"""
+        """Synchronous implementation of the delete."""
         if path.exists():
             path.unlink()
             return True

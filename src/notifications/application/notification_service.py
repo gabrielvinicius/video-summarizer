@@ -6,11 +6,11 @@ from src.shared.utils.id_generator import generate_id
 class NotificationService:
     def __init__(
         self,
-        email_adapter,  # Adaptador para SMTP
-        sms_adapter,  # Adaptador para Twilio
-        webhook_adapter,  # Adaptador para webhook
+        email_adapter,  # Adapter for SMTP
+        sms_adapter,  # Adapter for Twilio
+        webhook_adapter,  # Adapter for webhooks
         notification_repository,
-        user_repository  # Repositório do módulo auth
+        user_repository  # Repository from the auth module
     ):
         self.email_adapter = email_adapter
         self.sms_adapter = sms_adapter
@@ -24,10 +24,10 @@ class NotificationService:
         message: str,
         notification_type: NotificationType
     ) -> Notification:
-        """Envia uma notificação e persiste o status."""
+        """Sends a notification and persists its status."""
         user = await self.user_repo.find_by_id(user_id)
         if not user:
-            raise ValueError("Usuário não encontrado")
+            raise ValueError("User not found")
 
         notification = Notification(
             id=generate_id(),

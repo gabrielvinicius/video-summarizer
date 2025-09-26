@@ -1,15 +1,16 @@
-from datetime import datetime, timedelta
 from uuid import UUID
 from passlib.context import CryptContext
 from typing import Optional
+
+from src.auth.config.settings import AuthSettings
 from src.auth.domain.user import User, UserRole
-from src.auth.config.settings import AuthSettings  # Importação corrigida
-from src.shared.utils.id_generator import generate_id
 from src.auth.infrastructure.user_repository import UserRepository
 from src.auth.utils.token import create_access_token as token_util_create, verify_token as token_util_verify
+from src.shared.utils.id_generator import generate_id
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 settings = AuthSettings()
+
 
 class AuthService:
     def __init__(self, user_repository: UserRepository):
@@ -19,9 +20,9 @@ class AuthService:
         self.access_token_expire_minutes = settings.access_token_expire_minutes
 
     async def create_user(self, email: str, password: str) -> User:
-        """Cria um novo usuário com senha hasheada."""
+        """Creates a new user with a hashed password."""
         if await self.user_repository.find_by_email(email):
-            raise ValueError("Email já registrado")
+            raise ValueError("Email already registered")
 
         hashed_password = pwd_context.hash(password)
         user = User(
@@ -44,5 +45,5 @@ class AuthService:
     def verify_token(self, token: str) -> Optional[User]:
         return token_util_verify(token)
 
-    async def get_user_by_id(self, user_uuid : str) -> User:
+    async def get_user_by_id(self, user_uuid: str) -> User:
         return await self.user_repository.find_by_id(UUID(user_uuid))

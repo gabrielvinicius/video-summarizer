@@ -37,19 +37,19 @@ Base = declarative_base()
 
 # Async DB session dependency (e.g. for FastAPI)
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    print("Abrindo sessão DB")
+    print("Opening DB session")
     async with AsyncSessionLocal() as session:
         try:
             yield session
         finally:
-            print("Fechando sessão DB")
+            print("Closing DB session")
 
 
 # Sync DB session dependency (e.g. for CLI tools, tests)
 def get_sync_db() -> Generator[Session, None, None]:
-    print("Abrindo sessão DB")
+    print("Opening DB session")
     with SessionLocal() as session:
         try:
             yield session
         finally:
-            print("Fechando sessão DB")
+            print("Closing DB session")

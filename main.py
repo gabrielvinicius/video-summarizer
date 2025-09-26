@@ -1,12 +1,12 @@
 import asyncio
 import time
 
-from fastapi import FastAPI, Depends, Request,Response
+from fastapi import FastAPI, Depends, Request, Response
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
-# Importe todas as rotas
+# Import routers
 from src.auth.api.routers import router as auth_router
 from src.video_management.api.routers import router as video_router
 from src.summarization.api.routers import router as summary_router
@@ -14,17 +14,11 @@ from src.notifications.api.routers import router as notification_router
 from src.transcription.api.routers import router as transcription_router
 from src.metrics.api.routers import router as metrics_router
 
-# Importe dependências de banco de dados e container
+# Import container and database dependencies
 from src.shared.container import build_container, ApplicationContainer
 from src.shared.infrastructure.database import Base, engine, AsyncSessionLocal
-# from src.shared.dependencies import get_db_session, get_container, get_video_service
 
-# Importe event handlers
-from src.transcription.application.event_handlers import register_event_handlers as register_transcription_handlers
-from src.summarization.application.event_handlers import register_event_handlers as register_summary_handlers
-from src.notifications.application.event_handlers import register_event_handlers as register_notification_handlers
-
-# --- Métricas Prometheus (existentes) ---
+# --- Prometheus Metrics ---
 REQUEST_COUNT = Counter(
     'http_requests_total',
     'Total HTTP Requests',
@@ -35,177 +29,148 @@ REQUEST_LATENCY = Histogram(
     'HTTP Request Latency',
     ['method', 'endpoint']
 )
-# ----------------------------
 
-# --- Novas Métricas de Negócio ---
-# Contadores para operações de alto nível
+# --- Business Metrics ---
 VIDEO_UPLOADS_TOTAL = Counter(
     'video_uploads_total',
-    'Total de vídeos enviados',
+    'Total videos uploaded',
     ['status']  # status: success, failure
 )
 
 TRANSCRIPTIONS_TOTAL = Counter(
     'transcriptions_total',
-    'Total de transcrições processadas',
+    'Total transcriptions processed',
     ['status']  # status: success, failure
 )
 
 SUMMARIZATIONS_TOTAL = Counter(
     'summarizations_total',
-    'Total de sumarizações geradas',
+    'Total summaries generated',
     ['status']  # status: success, failure
 )
 
-# Histogramas para tempos de processamento
-VIDEO_PROCESSING_DURATION = Histogram(
-    'video_processing_duration_seconds',
-    'Tempo total de processamento de um vídeo (upload + transcrição + sumarização)',
-    ['stage']  # stage: transcription, summarization
-)
-
-# --- Novas Métricas de Duração por Serviço ---
+# --- Processing Duration Histograms ---
 TRANSCRIPTION_DURATION = Histogram(
     'transcription_duration_seconds',
-    'Tempo de processamento da transcrição por vídeo',
-    ['video_id']  # Etiqueta para rastrear por vídeo
+    'Transcription processing time per video',
+    ['video_id']
 )
 
 SUMMARIZATION_DURATION = Histogram(
     'summarization_duration_seconds',
-    'Tempo de processamento da sumarização por vídeo',
-    ['video_id']  # Etiqueta para rastrear por vídeo
-)
-UPLOAD_DURATION = Histogram(
-    'summarization_duration_seconds',
-    'Tempo de processamento de upload por vídeo',
-    ['video_id']  # Etiqueta para rastrear por vídeo
-)
-# ----------------------------
-# Gauges para estado do sistema
-ACTIVE_PROCESSES = Gauge(
-    'active_video_processes',
-    'Número de vídeos atualmente sendo processados'
+    'Summarization processing time per video',
+    ['video_id']
 )
 
-# ----------------------------
+UPLOAD_DURATION = Histogram(
+    'upload_duration_seconds',
+    'Upload processing time per video',
+    ['video_id']
+)
+
+# --- System State Gauges ---
+ACTIVE_PROCESSES = Gauge(
+    'active_video_processes',
+    'Number of videos currently being processed'
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Criação das tabelas do banco de dados
-    print("⏳ Criando tabelas do banco de dados...")
+    # Create database tables
+    print("⏳ Creating database tables...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Criação do container de dependências
-    print("⚙️ Inicializando container de dependências...")
+    # Initialize dependency container
+    print("⚙️ Initializing dependency container...")
     async with AsyncSessionLocal() as session:
         container = await build_container(session)
         app.state.container = container
 
-        # Registra event handlers
-        # print("🔔 Registrando handlers de eventos...")
-        # await register_transcription_handlers(container["event_bus"])
-        # await register_summary_handlers(container["event_bus"])
-        # await register_notification_handlers(container["event_bus"])
-
-        # Inicia o event bus
-        print("🚀 Iniciando barramento de eventos...")
+        # Start the event bus listener
+        print("🚀 Starting event bus...")
         await container["event_bus"].start_listener()
 
         yield
 
-        # Limpeza ao encerrar a aplicação
-        print("🛑 Encerrando recursos...")
+        # Clean up resources on shutdown
+        print("🛑 Shutting down resources...")
         await container.dispose()
         await engine.dispose()
 
 
 app = FastAPI(
-    title="API de Gerenciamento de Vídeos",
-    description="API para upload, transcrição e sumarização de vídeos",
+    title="Video Management API",
+    description="API for uploading, transcribing, and summarizing videos",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
-# --- Middleware para Métricas ---
+
+# --- Metrics Middleware ---
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
-    method = request.method
-    endpoint = request.url.path
-
-    # Inicia o timer
     start_time = time.time()
-
     response = await call_next(request)
-
-    # Calcula a latência
     latency = time.time() - start_time
 
-    # Atualiza as métricas
-    REQUEST_COUNT.labels(method=method, endpoint=endpoint, status_code=response.status_code).inc()
-    REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(latency)
+    REQUEST_COUNT.labels(method=request.method, endpoint=request.url.path, status_code=response.status_code).inc()
+    REQUEST_LATENCY.labels(method=request.method, endpoint=request.url.path).observe(latency)
 
     return response
-# ----------------------------
 
-# --- Endpoint de Métricas ---
+
+# --- Metrics Endpoint ---
 @app.get("/metrics")
 async def get_metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
-# ----------------------------
 
-# Função para injetar serviços nas rotas
+
+# --- Dependency Injection Helper ---
 def get_service(service_name: str):
     async def _get_service(request: Request):
-        container = request.app.state.container
-        return container[service_name]
-
+        return request.app.state.container[service_name]
     return _get_service
 
 
-# Registra rotas com prefixos e tags organizadas
+# --- Route Registration ---
 app.include_router(
     transcription_router,
-    #prefix="/transcriptions",
-    tags=["Transcrições"],
+    tags=["Transcriptions"],
     dependencies=[Depends(get_service("transcription_service"))]
 )
 app.include_router(
     summary_router,
-    #prefix="/summaries",
-    tags=["Sumarizações"],
+    tags=["Summaries"],
     dependencies=[Depends(get_service("summarization_service"))]
 )
 app.include_router(
     notification_router,
-    #prefix="/notifications",
-    tags=["Notificações"],
+    tags=["Notifications"],
     dependencies=[Depends(get_service("event_bus"))]
 )
 app.include_router(
     auth_router,
-    #prefix="/notifications",
-    tags=["Autenticação"],
+    tags=["Authentication"],
     dependencies=[Depends(get_service("event_bus"))]
 )
 app.include_router(
     video_router,
-    #prefix="/notifications",
     tags=["Videos"],
     dependencies=[Depends(get_service("event_bus"))]
 )
-
 app.include_router(
     metrics_router,
     prefix="/metrics",
     tags=["Metrics"]
 )
 
-# Rota de saúde da aplicação
-@app.get("/health", tags=["Sistema"])
+
+# --- Health Check Endpoint ---
+@app.get("/health", tags=["System"])
 async def health_check():
     return {
         "status": "healthy",
@@ -219,12 +184,12 @@ async def health_check():
     }
 
 
-# Middleware para log de requisições
+# --- Logging Middleware ---
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    print(f"📥 Recebida requisição: {request.method} {request.url}")
+    print(f"📥 Request received: {request.method} {request.url}")
     response = await call_next(request)
-    print(f"📤 Respondendo: {response.status_code}")
+    print(f"📤 Responding: {response.status_code}")
     return response
 
 

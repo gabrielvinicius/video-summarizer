@@ -9,7 +9,8 @@ import io
 import resampy
 import logging
 
-from src.transcription.infrastructure.speech_recognition import ISpeechRecognition
+# Importação corrigida para o novo arquivo de interfaces
+from src.transcription.infrastructure.interfaces import ISpeechRecognition
 
 logger = logging.getLogger(__name__)
 

@@ -21,7 +21,7 @@ def process_transcription_task(self, video_id: str, language: str = "en"):
     try:
         return asyncio.run(_run_transcription(video_id, language))
     except Exception as e:
-        logger.error(f"Erro ao transcrever vídeo {video_id}: {str(e)}", exc_info=True)
+        logger.error(f"Error transcribing video {video_id}: {str(e)}", exc_info=True)
         return None
 
 
@@ -47,5 +47,5 @@ async def _run_transcription(video_id: str, language: str):
             # Pass the language to the service method
             return await service.process_transcription(video_id=str(video_id), language=language)
         except Exception as e:
-            logger.error(f"Erro ao processar transcrição do vídeo {video_id}: {str(e)}", exc_info=True)
+            logger.error(f"Error processing transcription for video {video_id}: {str(e)}", exc_info=True)
             raise

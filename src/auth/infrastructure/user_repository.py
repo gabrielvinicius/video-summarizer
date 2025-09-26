@@ -16,7 +16,7 @@ class UserRepository:
         return isinstance(self.db, AsyncSession)
 
     async def save(self, user: User) -> User:
-        """Salva usuário no banco de dados."""
+        """Saves a user to the database."""
         self.db.add(user)
         try:
             if self._is_async():
@@ -31,11 +31,11 @@ class UserRepository:
                 await self.db.rollback()
             else:
                 self.db.rollback()
-            logger.error(f"Erro ao salvar usuário {getattr(user, 'id', None)}: {e}")
+            logger.error(f"Error saving user {getattr(user, 'id', None)}: {e}")
             raise
 
     async def find_by_email(self, email: str) -> Optional[User]:
-        """Busca usuário por email."""
+        """Finds a user by email."""
         stmt = select(User).where(User.email == email)
         if self._is_async():
             result = await self.db.execute(stmt)
@@ -45,7 +45,7 @@ class UserRepository:
             return result.scalar_one_or_none()
 
     async def find_by_id(self, user_id: UUID) -> Optional[User]:
-        """Busca usuário por ID."""
+        """Finds a user by ID."""
         stmt = select(User).where(User.id == user_id)
         if self._is_async():
             result = await self.db.execute(stmt)
@@ -55,7 +55,7 @@ class UserRepository:
             return result.scalar_one_or_none()
 
     async def delete(self, user_id: UUID) -> bool:
-        """Remove um usuário pelo ID. Retorna True se deletou, False se não existia."""
+        """Deletes a user by ID. Returns True if deleted, False if not found."""
         stmt = delete(User).where(User.id == user_id).returning(User.id)
         try:
             if self._is_async():
@@ -72,11 +72,11 @@ class UserRepository:
                 await self.db.rollback()
             else:
                 self.db.rollback()
-            logger.error(f"Erro ao deletar usuário {user_id}: {e}")
+            logger.error(f"Error deleting user {user_id}: {e}")
             raise
 
     async def list_all(self) -> Sequence[User]:
-        """Retorna todos os usuários."""
+        """Returns all users."""
         stmt = select(User)
         if self._is_async():
             result = await self.db.execute(stmt)

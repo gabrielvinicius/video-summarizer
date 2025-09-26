@@ -1,10 +1,2 @@
-from abc import ABC, abstractmethod
-from typing import Optional
-
-
-class ISpeechRecognition(ABC):
-
-    @abstractmethod
-    async def transcribe(self, file: bytes, language: str = "en") -> Optional[str]:
-        """Transcribes an audio file to text, with an optional language hint."""
-        pass
+# This file is deprecated and can be removed.
+# The ISpeechRecognition interface has been moved to src/transcription/infrastructure/interfaces.py

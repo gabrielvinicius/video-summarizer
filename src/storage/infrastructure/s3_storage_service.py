@@ -40,7 +40,7 @@ class S3StorageService(StorageService):
         try:
             return await loop.run_in_executor(None, _upload)
         except Exception as e:
-            raise StorageException("Erro ao fazer upload no S3", e)
+            raise StorageException("Error uploading to S3", e)
 
     async def download(self, file_path: Union[str, Path]) -> Optional[bytes]:
         loop = asyncio.get_event_loop()
@@ -58,7 +58,7 @@ class S3StorageService(StorageService):
         try:
             return await loop.run_in_executor(None, _download)
         except Exception as e:
-            raise StorageException("Erro ao baixar do S3", e)
+            raise StorageException("Error downloading from S3", e)
 
     async def delete(self, file_path: Union[str, Path]) -> bool:
         loop = asyncio.get_event_loop()
@@ -76,7 +76,7 @@ class S3StorageService(StorageService):
         try:
             return await loop.run_in_executor(None, _delete)
         except Exception as e:
-            raise StorageException("Erro ao deletar do S3", e)
+            raise StorageException("Error deleting from S3", e)
 
     async def exists(self, file_path: Union[str, Path]) -> bool:
         loop = asyncio.get_event_loop()
@@ -94,4 +94,4 @@ class S3StorageService(StorageService):
         try:
             return await loop.run_in_executor(None, _exists)
         except Exception as e:
-            raise StorageException("Erro ao verificar existência no S3", e)
+            raise StorageException("Error checking existence in S3", e)

@@ -10,7 +10,8 @@ from src.shared.events.domain_events import TranscriptionCompleted, Transcriptio
 from src.shared.events.event_bus import EventBus
 from src.storage.application.storage_service import StorageService
 from src.transcription.domain.transcription import Transcription, TranscriptionStatus
-from src.transcription.infrastructure.speech_recognition import ISpeechRecognition
+# Importação corrigida para o novo arquivo de interfaces
+from src.transcription.infrastructure.interfaces import ISpeechRecognition
 from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
 from src.video_management.application.video_service import VideoService
 

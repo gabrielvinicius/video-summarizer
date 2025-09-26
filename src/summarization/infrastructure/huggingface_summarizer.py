@@ -7,18 +7,18 @@ from threading import Lock
 class HuggingFaceSummarizer:
     def __init__(self, model_name="google-t5/t5-base"):
         """
-        Inicializa o sumarizador com detecção automática de dispositivo.
+        Initializes the summarizer with automatic device detection.
         """
         self.model_name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-        # Comprimentos máximos baseados no modelo
+        # Max lengths based on the model
         self.model_max_length = getattr(self.tokenizer, 'model_max_length', 1024)
-        self.max_input_length = min(self.model_max_length, 512)  # Melhor desempenho com mais contexto
+        self.max_input_length = min(self.model_max_length, 512)  # Better performance with more context
         self.max_summary_length = 64
         self.min_summary_length = 16
 
-        # Pipeline de sumarização com detecção automática de dispositivo
+        # Summarization pipeline with automatic device detection
         self.summarizer = pipeline(
             "summarization",
             model=model_name,
@@ -27,21 +27,21 @@ class HuggingFaceSummarizer:
             device=-1
         )
 
-        # Dispositivo detectado automaticamente
+        # Automatically detected device
         self.device = self.summarizer.device
-        print(f"HuggingFaceSummarizer inicializado. Dispositivo selecionado automaticamente: {self.device}")
+        print(f"HuggingFaceSummarizer initialized. Automatically selected device: {self.device}")
 
         self.lock = Lock()
 
     def empty_device_cache(self):
-        """Libera a memória não utilizada do dispositivo, se aplicável."""
+        """Frees unused device memory, if applicable."""
         if self.device.type == 'cuda':
             torch.cuda.empty_cache()
         elif self.device.type == 'xpu':
             torch.xpu.empty_cache()
 
     def split_text_into_chunks(self, text: str) -> list[str]:
-        """Divide o texto em chunks baseados em tokens"""
+        """Splits the text into token-based chunks"""
         if not text.strip():
             return []
 
@@ -57,11 +57,11 @@ class HuggingFaceSummarizer:
         ]
 
     async def summarize(self, text: str) -> str:
-        """Processa o texto em chunks e retorna o resumo concatenado"""
+        """Processes the text in chunks and returns the concatenated summary"""
         if not text.strip():
             return ""
 
-        # Limpa o cache do dispositivo antes de iniciar
+        # Clear device cache before starting
         self.empty_device_cache()
 
         print(self.summarizer(text, max_length=130, min_length=30, do_sample=False))
@@ -78,7 +78,7 @@ class HuggingFaceSummarizer:
         return " ".join(summaries)
 
     async def _summarize_chunk(self, chunk: str) -> str:
-        """Processa um chunk individual com tratamento de erro robusto"""
+        """Processes an individual chunk with robust error handling"""
         with self.lock:
             loop = asyncio.get_event_loop()
             try:
@@ -95,5 +95,5 @@ class HuggingFaceSummarizer:
                     )[0]['summary_text']
                 )
             except Exception as e:
-                print(f"Erro ao sumarizar chunk: {str(e)}")
+                print(f"Error summarizing chunk: {str(e)}")
                 return ""

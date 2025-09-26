@@ -10,9 +10,9 @@ import importlib
 import pkgutil
 import pathlib
 
-# Registrador de serviços
+# Service registry
 _storage_registry: Dict[str, Type[StorageService]] = {}
-_plugins_loaded = False  # Garante que plugins só sejam carregados uma vez
+_plugins_loaded = False  # Ensures plugins are loaded only once
 
 
 def register_storage(provider: str):
@@ -24,13 +24,13 @@ def register_storage(provider: str):
 
 async def get_storage_service() -> StorageService:
     load_dotenv(override=True)
-    _load_storage_plugins()  # Lazy-load dos providers
+    _load_storage_plugins()  # Lazy-load providers
     settings = StorageSettings()
     provider = settings.provider
 
     if provider not in _storage_registry:
-        raise ValueError(f"Storage provider '{provider}' não está registrado")
-    return _storage_registry[provider]()  # Cria instância do provider
+        raise ValueError(f"Storage provider '{provider}' is not registered")
+    return _storage_registry[provider]()  # Create provider instance
 
 
 def _load_storage_plugins():
@@ -39,12 +39,12 @@ def _load_storage_plugins():
         return
 
     package_path = pathlib.Path(__file__).parent
-    package_name = __name__.rsplit(".", 1)[0]  # "storage.infrastructure"
+    package_name = __name__.rsplit(".", 1)[0]  # e.g., "storage.infrastructure"
 
     for _, module_name, _ in pkgutil.iter_modules([str(package_path)]):
         if module_name.startswith("_"):
-            continue  # Evita importar arquivos como __init__.py
+            continue  # Avoid importing files like __init__.py
         full_module_name = f"{package_name}.{module_name}"
         importlib.import_module(full_module_name)
 
-    # _plugins_loaded = True
+    _plugins_loaded = True

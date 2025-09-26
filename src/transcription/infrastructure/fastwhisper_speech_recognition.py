@@ -4,7 +4,8 @@ import asyncio
 import logging
 from faster_whisper import WhisperModel
 
-from src.transcription.infrastructure.speech_recognition import ISpeechRecognition
+# Importação corrigida para o novo arquivo de interfaces
+from src.transcription.infrastructure.interfaces import ISpeechRecognition
 
 logger = logging.getLogger(__name__)
 
@@ -25,15 +26,17 @@ class FastWhisperTranscriber(ISpeechRecognition):
         self.language = language
         self.sample_rate = 16000
 
-    async def transcribe(self, file: bytes) -> Optional[str]:
+    async def transcribe(self, file: bytes, language: str = "en") -> Optional[str]:
         try:
+            # O idioma passado como argumento tem precedência sobre o idioma da instância
+            lang_to_use = language if language else self.language
             audio_array, sample_rate = await self._decode_audio_bytes(file)
-            return await self._transcribe_audio(audio_array, sample_rate)
+            return await self._transcribe_audio(audio_array, sample_rate, lang_to_use)
         except Exception as e:
             logger.error(f"Transcription failed: {str(e)}", exc_info=True)
             raise RuntimeError(f"Transcription error: {str(e)}")
 
-    async def _transcribe_audio(self, audio: np.ndarray, sample_rate: int) -> str:
+    async def _transcribe_audio(self, audio: np.ndarray, sample_rate: int, language: str) -> str:
         loop = asyncio.get_running_loop()
 
         # Executa o reconhecimento em thread separada
@@ -41,11 +44,10 @@ class FastWhisperTranscriber(ISpeechRecognition):
             None,
             self.model.transcribe,
             audio,
-            language=self.language,
+            language=language,
             beam_size=5,
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=500),
-            sample_rate=sample_rate
         )
 
         # Combina todos os segmentos de texto
@@ -80,4 +82,5 @@ class FastWhisperTranscriber(ISpeechRecognition):
 
         # Converte bytes para array numpy int16
         audio_array = np.frombuffer(stdout, dtype=np.int16)
+        # A decodificação já está na sample_rate correta, então não precisamos retornar
         return audio_array, self.sample_rate

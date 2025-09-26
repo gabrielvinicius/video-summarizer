@@ -6,13 +6,13 @@ import redis.asyncio as aioredis
 import logging
 
 from src.shared.config.broker_settings import BrokerSettings
-from src.shared.events.domain_events import DomainEvent  # Importação adicionada
+from src.shared.events.domain_events import DomainEvent
 
-# Configurações
+# Settings
 settings = BrokerSettings()
 logger = logging.getLogger(__name__)
 
-# Celery (mantido para os tasks assíncronos)
+# Celery (kept for async tasks)
 celery = Celery(__name__, broker=settings.redis_url)
 celery.conf.task_serializer = 'json'
 celery.conf.result_serializer = 'json'
@@ -38,30 +38,28 @@ class EventBus:
         self._listener_task: Optional[asyncio.Task] = None
 
     def subscribe(self, event_type: Type[DomainEvent], handler: Callable[[Dict], Union[None, Coroutine]]):
-        """Registra um handler local para um tipo de evento de domínio."""
+        """Registers a local handler for a domain event type."""
         event_name = event_type.__name__
         if event_name not in self.subscribers:
             self.subscribers[event_name] = []
         self.subscribers[event_name].append(handler)
 
     async def publish(self, event: DomainEvent):
-        """Publica um evento de domínio no Redis."""
+        """Publishes a domain event to Redis."""
         event_type = event.__class__.__name__
         data = event.to_dict()
         try:
             await redis_client.publish(event_type, json.dumps(data, default=str))
         except TypeError as e:
-            raise ValueError(f"Erro ao serializar o payload do evento: {e}")
+            raise ValueError(f"Error serializing event payload: {e}")
 
     async def _listen(self):
-        """Loop principal para escutar eventos Redis e despachar handlers."""
-        # O restante do código não precisa de alteração, pois já trabalha com
-        # o nome do evento como string e o payload como um dicionário JSON.
+        """Main loop to listen for Redis events and dispatch handlers."""
         while True:
             try:
                 pubsub = redis_client.pubsub()
                 if not self.subscribers:
-                    await asyncio.sleep(1) # Evita loop ocupado se não houver assinantes
+                    await asyncio.sleep(1)  # Avoids busy-looping if there are no subscribers
                     continue
 
                 await pubsub.subscribe(*self.subscribers.keys())
@@ -82,27 +80,27 @@ class EventBus:
                                     handler(data)
 
             except Exception as e:
-                logger.warning(f"[EventBus] Erro no Redis: {e}. Tentando novamente em 5s...")
+                logger.warning(f"[EventBus] Redis error: {e}. Retrying in 5s...")
                 await asyncio.sleep(5)
 
     async def start_listener(self):
-        """Inicia o listener de eventos Redis em segundo plano."""
+        """Starts the Redis event listener in the background."""
         if not self._listener_task:
             self._listener_task = asyncio.create_task(self._listen())
-            logger.info("[EventBus] Listener iniciado.")
+            logger.info("[EventBus] Listener started.")
 
     async def stop_listener(self):
-        """Encerra conexões com Redis."""
+        """Closes Redis connections."""
         try:
             if self._listener_task:
                 self._listener_task.cancel()
             await redis_client.close()
-            logger.info("[EventBus] Cliente Redis encerrado.")
+            logger.info("[EventBus] Redis client closed.")
         except Exception as e:
-            logger.error(f"[EventBus] Falha ao encerrar Redis: {e}")
+            logger.error(f"[EventBus] Failed to close Redis: {e}")
 
 
-# Instância singleton
+# Singleton instance
 _event_bus_instance: Optional[EventBus] = None
 
 

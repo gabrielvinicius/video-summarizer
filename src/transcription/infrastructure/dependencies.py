@@ -2,7 +2,8 @@ from typing import Any, Coroutine
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.transcription.infrastructure.speech_recognition import ISpeechRecognition
+# Importação corrigida para o novo arquivo de interfaces
+from src.transcription.infrastructure.interfaces import ISpeechRecognition
 from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
 from .huggingface_speech_recognition import HuggingfaceTranscriber
 from .transcription_repository import TranscriptionRepository
