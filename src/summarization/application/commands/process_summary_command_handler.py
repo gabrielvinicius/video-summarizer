@@ -2,14 +2,14 @@
 import time
 import structlog
 
-from src.analytics.application.analytics_service import AnalyticsService
+from src.analytics.application.queries.analytics_queries import AnalyticsQueries
 from src.metrics.application.metrics_service import MetricsService
 from src.shared.events.domain_events import SummarizationProgress
 from src.shared.events.event_bus import EventBus
 from src.summarization.domain.interfaces import ISummaryRepository
 from src.summarization.domain.summary import Summary, SummaryStatus
 from src.summarization.infrastructure.interfaces import ISummarizer
-from src.transcription.application.transcription_service import TranscriptionService
+from src.transcription.application.queries.transcription_queries import TranscriptionQueries
 from .process_summary_command import ProcessSummaryCommand
 
 logger = structlog.get_logger(__name__)
@@ -20,16 +20,16 @@ class ProcessSummaryCommandHandler:
         self,
         summarizer: ISummarizer,
         summary_repo: ISummaryRepository,
-        transcription_service: TranscriptionService,
+        transcription_queries: TranscriptionQueries,
         metrics_service: MetricsService,
-        analytics_service: AnalyticsService,
+        analytics_queries: AnalyticsQueries, # Correct dependency
         event_bus: EventBus
     ):
         self.summarizer = summarizer
         self.summary_repo = summary_repo
-        self.transcription_service = transcription_service
+        self.transcription_queries = transcription_queries
         self.metrics_service = metrics_service
-        self.analytics_service = analytics_service
+        self.analytics_queries = analytics_queries # Correct dependency
         self.event_bus = event_bus
 
     async def handle(self, command: ProcessSummaryCommand) -> Summary:
@@ -49,13 +49,13 @@ class ProcessSummaryCommandHandler:
         await self.summary_repo.save(summary)
 
         try:
-            transcription = await self.transcription_service.get_transcription_by_id(command.transcription_id)
+            transcription = await self.transcription_queries.get_by_id(command.transcription_id)
             if not transcription or not transcription.text:
                 raise ValueError("Transcription not found or has no text")
 
             text_length = len(transcription.text)
             video_duration_seconds = text_length / 100
-            estimate = await self.analytics_service.estimate_processing_time(video_duration_seconds)
+            estimate = await self.analytics_queries.estimate_processing_time(video_duration_seconds)
 
             await self.event_bus.publish(SummarizationProgress(
                 transcription_id=command.transcription_id,

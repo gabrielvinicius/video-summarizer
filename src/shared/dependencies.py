@@ -25,8 +25,14 @@ def get_service(service_name: str):
 
 
 # Specific service dependencies for route injection
-get_auth_service = get_service("auth_service")
-get_notification_service = get_service("notification_service")
+
+# Auth
+get_auth_service = get_service("auth_service") # For Commands
+get_auth_queries = get_service("auth_queries") # For Queries
+
+# Notification
+get_notification_service = get_service("notification_service") # For Commands
+get_notification_queries = get_service("notification_queries") # For Queries
 
 # Video
 get_video_service = get_service("video_service") # For Commands
@@ -35,3 +41,9 @@ get_video_queries = get_service("video_queries") # For Queries
 # Summarization
 get_summarization_service = get_service("summarization_service") # For Commands
 get_summary_queries = get_service("summary_queries") # For Queries
+
+# Transcription
+get_transcription_queries = get_service("transcription_queries") # For Queries
+
+# Analytics
+get_analytics_queries = get_service("analytics_queries") # For Queries

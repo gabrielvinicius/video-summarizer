@@ -1,57 +1,28 @@
-from typing import Optional
-from src.notifications.domain.notification import Notification, NotificationStatus, NotificationType
-from src.shared.utils.id_generator import generate_id
+# src/notifications/application/notification_service.py
+from src.notifications.domain.notification import Notification, NotificationType
+# Import the new CQRS components
+from .commands.send_notification_command import SendNotificationCommand
+from .commands.send_notification_command_handler import SendNotificationCommandHandler
 
 
 class NotificationService:
+    """Facade service to dispatch notification commands."""
     def __init__(
         self,
-        email_adapter,  # Adapter for SMTP
-        sms_adapter,  # Adapter for Twilio
-        webhook_adapter,  # Adapter for webhooks
-        notification_repository,
-        user_repository  # Repository from the auth module
+        send_notification_handler: SendNotificationCommandHandler,
     ):
-        self.email_adapter = email_adapter
-        self.sms_adapter = sms_adapter
-        self.webhook_adapter = webhook_adapter
-        self.notification_repo = notification_repository
-        self.user_repo = user_repository
+        self.send_notification_handler = send_notification_handler
 
     async def send_notification(
-        self,
-        user_id: str,
-        message: str,
+        self, 
+        user_id: str, 
+        message: str, 
         notification_type: NotificationType
     ) -> Notification:
-        """Sends a notification and persists its status."""
-        user = await self.user_repo.find_by_id(user_id)
-        if not user:
-            raise ValueError("User not found")
-
-        notification = Notification(
-            id=generate_id(),
+        """Dispatches the SendNotificationCommand."""
+        command = SendNotificationCommand(
             user_id=user_id,
-            type=notification_type,
-            content=message
+            message=message,
+            notification_type=notification_type
         )
-        await self.notification_repo.save(notification)
-
-        try:
-            if notification_type == NotificationType.EMAIL:
-                await self.email_adapter.send(user.email, message)
-            elif notification_type == NotificationType.SMS:
-                await self.sms_adapter.send(user.phone, message)
-            elif notification_type == NotificationType.WEBHOOK:
-                await self.webhook_adapter.send(user.webhook_url, message)
-
-            notification.mark_as_sent()
-        except Exception as e:
-            notification.mark_as_failed(str(e))
-
-        await self.notification_repo.save(notification)
-        return notification
-
-    async def get_notification_by_id(self, notification_id: str) -> Optional[Notification]:
-        """Retrieves a notification by its ID."""
-        return await self.notification_repo.find_by_id(notification_id)
+        return await self.send_notification_handler.handle(command)

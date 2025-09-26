@@ -1,39 +1,23 @@
-from pydantic import BaseModel, Field
+# src/notifications/api/schemas.py
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
-from enum import Enum
+from pydantic import BaseModel
+from src.notifications.domain.notification import NotificationType
 
 
-class NotificationType(str, Enum):
-    EMAIL = "EMAIL"
-    SMS = "SMS"
-    WEBHOOK = "WEBHOOK"
-
-
-class NotificationStatus(str, Enum):
-    PENDING = "PENDING"
-    SENT = "SENT"
-    FAILED = "FAILED"
-
-
-class NotificationBase(BaseModel):
+class NotificationRequest(BaseModel):
+    user_id: UUID
+    message: str
     type: NotificationType
-    content: str
 
 
-class NotificationCreate(NotificationBase):
-    user_id: int
-
-
-class NotificationResponse(NotificationBase):
+class NotificationResponse(BaseModel):
     id: UUID
-    user_id: int
-    status: NotificationStatus
-    created_at: datetime
-    sent_at: Optional[datetime]
-    retries: int
-    error_message: Optional[str]
+    user_id: UUID
+    type: str
+    content: str
+    status: str
+    error_message: Optional[str] = None
 
     class Config:
-        from_attributes = True  # Para funcionar com ORM
+        orm_mode = True

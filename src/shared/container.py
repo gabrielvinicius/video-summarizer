@@ -6,6 +6,10 @@ from src.shared.events.event_bus import get_event_bus
 
 # Auth
 from src.auth.application.auth_service import AuthService
+from src.auth.application.commands.create_user_command_handler import CreateUserCommandHandler
+from src.auth.application.commands.authenticate_user_command_handler import AuthenticateUserCommandHandler
+from src.auth.application.queries.auth_queries import AuthQueries
+from src.auth.config.settings import AuthSettings
 from src.auth.infrastructure.user_repository import UserRepository
 
 # Video
@@ -18,7 +22,7 @@ from src.video_management.infrastructure.dependencies import get_video_repositor
 from src.storage.infrastructure.dependencies import get_storage_service_factory
 
 # Transcription
-from src.transcription.application.dependencies import get_transcription_service
+from src.transcription.application.queries.transcription_queries import TranscriptionQueries
 from src.transcription.infrastructure.dependencies import get_speech_recognition_service_factory, get_transcription_repository
 
 # Summarization
@@ -28,7 +32,7 @@ from src.summarization.infrastructure.dependencies import get_summarizer_service
 from src.summarization.infrastructure.summary_repository import SummaryRepository
 
 # Analytics
-from src.analytics.application.analytics_service import AnalyticsService
+from src.analytics.application.queries.analytics_queries import AnalyticsQueries
 from src.analytics.infrastructure.analytics_repository import AnalyticsRepository
 
 # Metrics
@@ -37,6 +41,8 @@ from src.metrics.infrastructure.prometheus_provider import PrometheusMetricsProv
 
 # Notifications
 from src.notifications.application.notification_service import NotificationService
+from src.notifications.application.commands.send_notification_command_handler import SendNotificationCommandHandler
+from src.notifications.application.queries.notification_queries import NotificationQueries
 from src.notifications.config.settings import SmtpSettings
 from src.notifications.infrastructure.notification_repository import NotificationRepository
 from src.notifications.infrastructure.smtp_adapter import SMTPAdapter
@@ -49,7 +55,6 @@ class ApplicationContainer:
         self._services: Dict[str, Any] = {}
 
     async def initialize(self, db_session: AsyncSession) -> None:
-        """Initializes all services and dependencies."""
         self._services["event_bus"] = get_event_bus()
         self._services["storage_service_factory"] = get_storage_service_factory()
         self._services["speech_recognition_service_factory"] = get_speech_recognition_service_factory()
@@ -70,12 +75,17 @@ class ApplicationContainer:
         self._services["metrics_service"] = MetricsService(provider=self._services["metrics_provider"])
 
     def _setup_analytics_services(self, db_session: AsyncSession) -> None:
+        """Configures analytics-related query handlers."""
         self._services["analytics_repository"] = AnalyticsRepository(db_session)
-        self._services["analytics_service"] = AnalyticsService(analytics_repo=self._services["analytics_repository"])
+        self._services["analytics_queries"] = AnalyticsQueries(analytics_repo=self._services["analytics_repository"])
 
     def _setup_auth_services(self, db_session: AsyncSession) -> None:
         self._services["user_repository"] = UserRepository(db=db_session)
-        self._services["auth_service"] = AuthService(user_repository=self._services["user_repository"])
+        self._services["auth_settings"] = AuthSettings()
+        create_user_handler = CreateUserCommandHandler(user_repository=self._services["user_repository"])
+        authenticate_user_handler = AuthenticateUserCommandHandler(user_repository=self._services["user_repository"], settings=self._services["auth_settings"])
+        self._services["auth_service"] = AuthService(create_user_handler=create_user_handler, authenticate_user_handler=authenticate_user_handler)
+        self._services["auth_queries"] = AuthQueries(user_repository=self._services["user_repository"])
 
     def _setup_notification_services(self, db_session: AsyncSession) -> None:
         smtp_settings = SmtpSettings()
@@ -83,7 +93,9 @@ class ApplicationContainer:
         self._services["sms_adapter"] = SmsAdapter()
         self._services["webhook_adapter"] = WebhookAdapter()
         self._services["notification_repository"] = NotificationRepository(db=db_session)
-        self._services["notification_service"] = NotificationService(email_adapter=self._services["email_adapter"], sms_adapter=self._services["sms_adapter"], webhook_adapter=self._services["webhook_adapter"], notification_repository=self._services["notification_repository"], user_repository=self._services["user_repository"])
+        send_notification_handler = SendNotificationCommandHandler(email_adapter=self._services["email_adapter"], sms_adapter=self._services["sms_adapter"], webhook_adapter=self._services["webhook_adapter"], notification_repository=self._services["notification_repository"], user_repository=self._services["user_repository"])
+        self._services["notification_service"] = NotificationService(send_notification_handler=send_notification_handler)
+        self._services["notification_queries"] = NotificationQueries(notification_repository=self._services["notification_repository"])
 
     async def _setup_video_services(self, db_session: AsyncSession) -> None:
         self._services["video_repository"] = await get_video_repository(db_session)
@@ -95,10 +107,9 @@ class ApplicationContainer:
 
     async def _setup_transcription_services(self, db_session: AsyncSession) -> None:
         self._services["transcription_repository"] = await get_transcription_repository(db_session)
-        self._services["transcription_service"] = await get_transcription_service(db=db_session, event_bus=self._services["event_bus"], storage_service_factory=self._services["storage_service_factory"], speech_recognition_service_factory=self._services["speech_recognition_service_factory"])
+        self._services["transcription_queries"] = TranscriptionQueries(transcription_repository=self._services["transcription_repository"])
 
     async def _setup_summarization_services(self, db_session: AsyncSession) -> None:
-        """Configures summarization-related services and query handlers."""
         self._services["summary_repository"] = SummaryRepository(db_session)
         self._services["summary_queries"] = SummaryQueries(summary_repository=self._services["summary_repository"])
         self._services["summarization_service"] = SummarizationService(event_bus=self._services["event_bus"])
