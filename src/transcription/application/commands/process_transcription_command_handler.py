@@ -9,10 +9,11 @@ from src.storage.application.storage_service import StorageService
 from src.transcription.domain.transcription import Transcription, TranscriptionStatus
 from src.transcription.infrastructure.interfaces import ISpeechRecognition
 from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
-# Import correct CQRS dependencies
 from src.video_management.application.queries.video_queries import VideoQueries
 from src.video_management.infrastructure.video_repository import VideoRepository
 from .process_transcription_command import ProcessTranscriptionCommand
+# Import the circuit breaker factory
+from src.shared.resilience.circuit_breaker import get_circuit_breaker
 
 logger = structlog.get_logger(__name__)
 
@@ -24,8 +25,8 @@ class ProcessTranscriptionCommandHandler:
         storage_service: StorageService,
         event_bus: EventBus,
         transcription_repository: TranscriptionRepository,
-        video_queries: VideoQueries, # Correct read dependency
-        video_repository: VideoRepository, # Correct write dependency
+        video_queries: VideoQueries,
+        video_repository: VideoRepository,
         metrics_service: MetricsService,
     ):
         self.speech_recognition = speech_recognition
@@ -47,12 +48,12 @@ class ProcessTranscriptionCommandHandler:
         transcription = await self.transcription_repo.find_by_video_id(command.video_id)
 
         try:
-            video.process() # Use the state pattern to transition
+            video.process()
             await self.video_repository.save(video)
             await self.event_bus.publish(TranscriptionStarted(video_id=command.video_id))
 
             if transcription and transcription.text and transcription.status == TranscriptionStatus.COMPLETED:
-                video.complete() # Ensure video state is consistent
+                video.complete()
                 await self.video_repository.save(video)
                 logger.info("transcription.completed", video_id=command.video_id, from_cache=True)
                 await self.event_bus.publish(TranscriptionCompleted(video_id=transcription.video_id, transcription_id=str(transcription.id)))
@@ -65,13 +66,19 @@ class ProcessTranscriptionCommandHandler:
             
             await self.transcription_repo.save(transcription)
 
-            audio_bytes = await self.storage_service.download(video.file_path)
-            text = await self.speech_recognition.transcribe(audio_bytes[0], language=command.language)
+            audio_bytes, _ = await self.storage_service.download(video.file_path)
+
+            # Get a circuit breaker for the specific provider
+            breaker_key = f"transcription_{self.speech_recognition.provider_name}"
+            breaker = get_circuit_breaker(breaker_key)
+
+            # Wrap the external call with the circuit breaker
+            text = await breaker.call_async(self.speech_recognition.transcribe, audio_bytes, language=command.language)
 
             transcription.mark_as_completed(text)
             await self.transcription_repo.save(transcription)
             
-            video.complete() # Use the state pattern to transition
+            video.complete()
             await self.video_repository.save(video)
 
             await self.event_bus.publish(TranscriptionCompleted(video_id=command.video_id, transcription_id=str(transcription.id)))
@@ -89,7 +96,7 @@ class ProcessTranscriptionCommandHandler:
             logger.error("transcription.failed", video_id=command.video_id, error=str(e), duration=duration)
 
             if video:
-                video.fail(str(e)[:500]) # Use the state pattern to transition
+                video.fail(str(e)[:500])
                 await self.video_repository.save(video)
 
             if transcription:

@@ -32,3 +32,6 @@ opentelemetry-exporter-jaeger>=1.25.0
 opentelemetry-instrumentation-fastapi>=0.46.0
 opentelemetry-instrumentation-celery>=0.46.0
 opentelemetry-instrumentation-sqlalchemy>=0.46.0
+
+# Resilience
+pybreaker>=1.1.0

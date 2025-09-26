@@ -11,6 +11,8 @@ from src.summarization.domain.summary import Summary, SummaryStatus
 from src.summarization.infrastructure.interfaces import ISummarizer
 from src.transcription.application.queries.transcription_queries import TranscriptionQueries
 from .process_summary_command import ProcessSummaryCommand
+# Import the circuit breaker factory
+from src.shared.resilience.circuit_breaker import get_circuit_breaker
 
 logger = structlog.get_logger(__name__)
 
@@ -22,14 +24,14 @@ class ProcessSummaryCommandHandler:
         summary_repo: ISummaryRepository,
         transcription_queries: TranscriptionQueries,
         metrics_service: MetricsService,
-        analytics_queries: AnalyticsQueries, # Correct dependency
+        analytics_queries: AnalyticsQueries,
         event_bus: EventBus
     ):
         self.summarizer = summarizer
         self.summary_repo = summary_repo
         self.transcription_queries = transcription_queries
         self.metrics_service = metrics_service
-        self.analytics_queries = analytics_queries # Correct dependency
+        self.analytics_queries = analytics_queries
         self.event_bus = event_bus
 
     async def handle(self, command: ProcessSummaryCommand) -> Summary:
@@ -64,7 +66,12 @@ class ProcessSummaryCommandHandler:
                 estimated_total_seconds=estimate["estimated_total_seconds"]
             ))
 
-            text = await self.summarizer.summarize(transcription.text)
+            # Get a circuit breaker for the specific provider
+            breaker_key = f"summarization_{self.summarizer.provider_name}"
+            breaker = get_circuit_breaker(breaker_key)
+
+            # Wrap the external call with the circuit breaker
+            text = await breaker.call_async(self.summarizer.summarize, transcription.text)
 
             await self.event_bus.publish(SummarizationProgress(
                 transcription_id=command.transcription_id,
