@@ -4,7 +4,6 @@ import asyncio
 import logging
 from faster_whisper import WhisperModel
 
-# Importação corrigida para o novo arquivo de interfaces
 from src.transcription.infrastructure.interfaces import ISpeechRecognition
 
 logger = logging.getLogger(__name__)
@@ -16,7 +15,7 @@ class FastWhisperTranscriber(ISpeechRecognition):
             model_size: str = "base",
             device: str = "cpu",
             compute_type: str = "int8",
-            language: Optional[str] = "pt",
+            language: Optional[str] = "en",
     ):
         self.model = WhisperModel(
             model_size,
@@ -26,20 +25,24 @@ class FastWhisperTranscriber(ISpeechRecognition):
         self.language = language
         self.sample_rate = 16000
 
+    @property
+    def provider_name(self) -> str:
+        return "fastwhisper"
+
     async def transcribe(self, file: bytes, language: str = "en") -> Optional[str]:
         try:
-            # O idioma passado como argumento tem precedência sobre o idioma da instância
+            # The language passed as an argument takes precedence over the instance's default language
             lang_to_use = language if language else self.language
-            audio_array, sample_rate = await self._decode_audio_bytes(file)
-            return await self._transcribe_audio(audio_array, sample_rate, lang_to_use)
+            audio_array, _ = await self._decode_audio_bytes(file)
+            return await self._transcribe_audio(audio_array, lang_to_use)
         except Exception as e:
             logger.error(f"Transcription failed: {str(e)}", exc_info=True)
             raise RuntimeError(f"Transcription error: {str(e)}")
 
-    async def _transcribe_audio(self, audio: np.ndarray, sample_rate: int, language: str) -> str:
+    async def _transcribe_audio(self, audio: np.ndarray, language: str) -> str:
         loop = asyncio.get_running_loop()
 
-        # Executa o reconhecimento em thread separada
+        # Run recognition in a separate thread
         segments, _ = await loop.run_in_executor(
             None,
             self.model.transcribe,
@@ -50,20 +53,20 @@ class FastWhisperTranscriber(ISpeechRecognition):
             vad_parameters=dict(min_silence_duration_ms=500),
         )
 
-        # Combina todos os segmentos de texto
+        # Combine all text segments
         return " ".join(segment.text for segment in segments)
 
     async def _decode_audio_bytes(self, file_bytes: bytes) -> Tuple[np.ndarray, int]:
-        """Decodifica bytes de áudio para array numpy usando FFmpeg"""
+        """Decodes audio bytes to a numpy array using FFmpeg."""
         command = [
             'ffmpeg',
-            '-i', 'pipe:0',  # Entrada via stdin
-            '-f', 's16le',  # Formato de saída: PCM signed 16-bit little-endian
-            '-ac', '1',  # Canal único (mono)
-            '-ar', str(self.sample_rate),  # Taxa de amostragem
-            '-loglevel', 'error',  # Somente erros
-            '-hide_banner',  # Oculta informações do banner
-            'pipe:1'  # Saída via stdout
+            '-i', 'pipe:0',  # Input from stdin
+            '-f', 's16le',  # Output format: PCM signed 16-bit little-endian
+            '-ac', '1',  # Single channel (mono)
+            '-ar', str(self.sample_rate),  # Sample rate
+            '-loglevel', 'error',  # Only log errors
+            '-hide_banner',  # Hide banner info
+            'pipe:1'  # Output to stdout
         ]
 
         process = await asyncio.create_subprocess_exec(
@@ -80,7 +83,6 @@ class FastWhisperTranscriber(ISpeechRecognition):
             err_msg = stderr.decode().strip() if stderr else f"FFmpeg error {process.returncode}"
             raise RuntimeError(f"Audio decoding failed: {err_msg}")
 
-        # Converte bytes para array numpy int16
+        # Convert bytes to numpy int16 array
         audio_array = np.frombuffer(stdout, dtype=np.int16)
-        # A decodificação já está na sample_rate correta, então não precisamos retornar
         return audio_array, self.sample_rate

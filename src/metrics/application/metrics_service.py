@@ -14,11 +14,14 @@ class MetricsService:
     def increment_summarization(self, status: str):
         self.provider.increment_counter("SUMMARIZATIONS_TOTAL", {"status": status})
 
-    def observe_transcription_duration(self, video_id: str, duration: float):
-        self.provider.observe_histogram("TRANSCRIPTION_DURATION", duration, {"video_id": video_id})
+    def observe_transcription_duration(self, video_id: str, duration: float, provider: str):
+        labels = {"video_id": video_id, "provider": provider}
+        self.provider.observe_histogram("TRANSCRIPTION_DURATION", duration, labels)
 
-    def observe_summarization_duration(self, video_id: str, duration: float):
-        self.provider.observe_histogram("SUMMARIZATION_DURATION", duration, {"video_id": video_id})
+    def observe_summarization_duration(self, video_id: str, duration: float, provider: str):
+        labels = {"video_id": video_id, "provider": provider}
+        self.provider.observe_histogram("SUMMARIZATION_DURATION", duration, labels)
 
-    def observe_upload_duration (self , video_id: str, duration: float ):
-        self.provider.observe_histogram("UPLOAD_DURATION", duration, {"video_id": video_id})
+    def observe_upload_duration(self, video_id: str, duration: float, provider: str):
+        labels = {"video_id": video_id, "provider": provider}
+        self.provider.observe_histogram("UPLOAD_DURATION", duration, labels)

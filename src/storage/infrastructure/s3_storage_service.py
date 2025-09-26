@@ -8,7 +8,7 @@ from src.storage.infrastructure.dependencies import register_storage
 from src.shared.config.storage_settings import StorageSettings
 
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union, Optional, Tuple
 
 
 @register_storage("s3")
@@ -26,6 +26,10 @@ class S3StorageService(StorageService):
         except ClientError:
             self.client.create_bucket(Bucket=self.settings.bucket_name)
 
+    @property
+    def provider_name(self) -> str:
+        return "s3"
+
     async def upload(self, file_path: Union[str, Path], file: bytes) -> bool:
         loop = asyncio.get_event_loop()
 
@@ -42,7 +46,7 @@ class S3StorageService(StorageService):
         except Exception as e:
             raise StorageException("Error uploading to S3", e)
 
-    async def download(self, file_path: Union[str, Path]) -> Optional[bytes]:
+    async def download(self, file_path: Union[str, Path]) -> Optional[Tuple[bytes, str]]:
         loop = asyncio.get_event_loop()
 
         def _download():
@@ -51,7 +55,9 @@ class S3StorageService(StorageService):
                     Bucket=self.settings.bucket_name,
                     Key=str(file_path)
                 )
-                return response["Body"].read()
+                content = response["Body"].read()
+                filename = str(file_path).split('/')[-1]
+                return content, filename
             except self.client.exceptions.NoSuchKey:
                 return None
 

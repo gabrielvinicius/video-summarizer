@@ -3,8 +3,10 @@ import torch
 import asyncio
 from threading import Lock
 
+from src.summarization.infrastructure.interfaces import ISummarizer
 
-class HuggingFaceSummarizer:
+
+class HuggingFaceSummarizer(ISummarizer):
     def __init__(self, model_name="google-t5/t5-base"):
         """
         Initializes the summarizer with automatic device detection.
@@ -12,13 +14,11 @@ class HuggingFaceSummarizer:
         self.model_name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-        # Max lengths based on the model
         self.model_max_length = getattr(self.tokenizer, 'model_max_length', 1024)
-        self.max_input_length = min(self.model_max_length, 512)  # Better performance with more context
+        self.max_input_length = min(self.model_max_length, 512)
         self.max_summary_length = 64
         self.min_summary_length = 16
 
-        # Summarization pipeline with automatic device detection
         self.summarizer = pipeline(
             "summarization",
             model=model_name,
@@ -27,11 +27,14 @@ class HuggingFaceSummarizer:
             device=-1
         )
 
-        # Automatically detected device
         self.device = self.summarizer.device
         print(f"HuggingFaceSummarizer initialized. Automatically selected device: {self.device}")
 
         self.lock = Lock()
+
+    @property
+    def provider_name(self) -> str:
+        return "huggingface"
 
     def empty_device_cache(self):
         """Frees unused device memory, if applicable."""
@@ -61,10 +64,7 @@ class HuggingFaceSummarizer:
         if not text.strip():
             return ""
 
-        # Clear device cache before starting
         self.empty_device_cache()
-
-        print(self.summarizer(text, max_length=130, min_length=30, do_sample=False))
 
         chunks = self.split_text_into_chunks(text)
         summaries = []

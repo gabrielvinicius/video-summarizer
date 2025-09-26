@@ -9,7 +9,6 @@ import resampy
 from transformers import pipeline
 import logging
 
-# Importação corrigida para o novo arquivo de interfaces
 from src.transcription.infrastructure.interfaces import ISpeechRecognition
 
 logger = logging.getLogger(__name__)
@@ -20,11 +19,15 @@ class HuggingfaceTranscriber(ISpeechRecognition):
         self.model = pipeline(task="automatic-speech-recognition",model=model_name)
         self.sample_rate = 16000  # Whisper expects 16kHz audio
 
+    @property
+    def provider_name(self) -> str:
+        return "huggingface"
+
     async def transcribe(self, file: bytes, language: str = "en") -> Optional[str]:
         path = None
         try:
             path = await self._decode_file_bytes(file)
-            # O pipeline do Hugging Face pode usar o idioma se o modelo suportar
+            # The Hugging Face pipeline can use the language if the model supports it
             result = self.model(path, generate_kwargs={"language": language})
 
             return result["text"]

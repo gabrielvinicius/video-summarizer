@@ -1,73 +1,38 @@
 # src/storage/application/storage_service.py
-from abc import ABC, abstractmethod
-from typing import Optional, Union
+from abc import ABC, abstractmethod, property_method
+from typing import Optional, Union, Tuple
 from pathlib import Path
-import logging
 
 
 class StorageService(ABC):
     """
     Abstract base class defining the interface for storage services.
-    Concrete implementations should handle specific storage backends.
     """
 
+    @property
     @abstractmethod
-    async def upload(self, file_path: Union[str, Path], file: bytes) -> bool:
-        """
-        Store a file in the storage system.
-
-        Args:
-            file_path: Destination path for the file (relative to storage root)
-            file: File content as bytes
-
-        Raises:
-            StorageException: If the operation fails
-        """
+    def provider_name(self) -> str:
+        """Returns the name of the storage provider (e.g., 'local', 's3')."""
         pass
 
     @abstractmethod
-    async def download(self, file_path: Union[str, Path]) -> Optional[bytes]:
-        """
-        Retrieve a file from the storage system.
+    async def upload(self, file_path: Union[str, Path], file: bytes) -> bool:
+        """Stores a file in the storage system."""
+        pass
 
-        Args:
-            file_path: Path to the file (relative to storage root)
-
-        Returns:
-            File content as bytes, or None if file doesn't exist
-
-        Raises:
-            StorageException: If the operation fails (except for missing files)
-        """
+    @abstractmethod
+    async def download(self, file_path: Union[str, Path]) -> Optional[Tuple[bytes, str]]:
+        """Retrieves a file from the storage system."""
         pass
 
     @abstractmethod
     async def delete(self, file_path: Union[str, Path]) -> bool:
-        """
-        Delete a file from the storage system.
-
-        Args:
-            file_path: Path to the file (relative to storage root)
-
-        Returns:
-            True if file was deleted, False if file didn't exist
-
-        Raises:
-            StorageException: If the operation fails
-        """
+        """Deletes a file from the storage system."""
         pass
 
     @abstractmethod
     async def exists(self, file_path: Union[str, Path]) -> bool:
-        """
-        Check if a file exists in the storage system.
-
-        Args:
-            file_path: Path to the file (relative to storage root)
-
-        Returns:
-            True if file exists, False otherwise
-        """
+        """Checks if a file exists in the storage system."""
         pass
 
 

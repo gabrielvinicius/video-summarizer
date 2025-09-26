@@ -5,12 +5,10 @@ from typing import Optional
 import structlog
 
 from src.metrics.application.metrics_service import MetricsService
-# Importação dos eventos de domínio tipados
 from src.shared.events.domain_events import TranscriptionCompleted, TranscriptionFailed, TranscriptionStarted
 from src.shared.events.event_bus import EventBus
 from src.storage.application.storage_service import StorageService
 from src.transcription.domain.transcription import Transcription, TranscriptionStatus
-# Importação corrigida para o novo arquivo de interfaces
 from src.transcription.infrastructure.interfaces import ISpeechRecognition
 from src.transcription.infrastructure.transcription_repository import TranscriptionRepository
 from src.video_management.application.video_service import VideoService
@@ -57,7 +55,6 @@ class TranscriptionService:
                 await self.transcription_repo.save(transcription)
 
             audio_bytes = await self._download_audio(transcription.video_id)
-            # Passa o parâmetro de idioma para o serviço de transcrição
             text = await self.speech_recognition.transcribe(audio_bytes, language=language)
 
             transcription.mark_as_completed(text)
@@ -70,7 +67,12 @@ class TranscriptionService:
 
             duration = time.time() - start_time
             self.metrics_service.increment_transcription('success')
-            self.metrics_service.observe_transcription_duration(video_id, duration)
+            # Observe metrics with the provider label
+            self.metrics_service.observe_transcription_duration(
+                video_id=video_id, 
+                duration=duration, 
+                provider=self.speech_recognition.provider_name
+            )
 
             logger.info("transcription.completed", video_id=video_id, duration=duration)
             return transcription

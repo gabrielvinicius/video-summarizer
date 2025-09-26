@@ -5,9 +5,8 @@ import structlog
 
 from src.analytics.application.analytics_service import AnalyticsService
 from src.metrics.application.metrics_service import MetricsService
-from src.shared.events.event_bus import EventBus
-# Importação dos eventos de domínio tipados
 from src.shared.events.domain_events import SummaryRequested, SummarizationProgress
+from src.shared.events.event_bus import EventBus
 from src.summarization.domain.interfaces import ISummaryRepository
 from src.summarization.domain.summary import Summary, SummaryStatus
 from src.summarization.infrastructure.interfaces import ISummarizer
@@ -17,14 +16,15 @@ logger = structlog.get_logger(__name__)
 
 
 class SummarizationService:
-    def __init__(self,
-                 summarizer: ISummarizer,
-                 summary_repo: ISummaryRepository,
-                 transcription_service: TranscriptionService,
-                 metrics_service: MetricsService,
-                 analytics_service: AnalyticsService,
-                 event_bus: EventBus
-                 ):
+    def __init__(
+            self,
+            summarizer: ISummarizer,
+            summary_repo: ISummaryRepository,
+            transcription_service: TranscriptionService,
+            metrics_service: MetricsService,
+            analytics_service: AnalyticsService,
+            event_bus: EventBus
+    ):
         self.summarizer = summarizer
         self.summary_repo = summary_repo
         self.transcription_service = transcription_service
@@ -61,10 +61,9 @@ class SummarizationService:
                 raise ValueError("Transcription not found or has no text")
 
             text_length = len(transcription.text)
-            video_duration_seconds = text_length / 100  # Simulação
+            video_duration_seconds = text_length / 100  # Simulation
             estimate = await self.analytics_service.estimate_processing_time(video_duration_seconds)
 
-            # Publica progresso estimado (25% no início)
             await self.event_bus.publish(SummarizationProgress(
                 transcription_id=transcription_id,
                 progress=25,
@@ -74,7 +73,6 @@ class SummarizationService:
 
             text = await self.summarizer.summarize(transcription.text)
 
-            # Publica progresso (75% após sumarização)
             await self.event_bus.publish(SummarizationProgress(
                 transcription_id=transcription_id,
                 progress=75,
@@ -83,9 +81,14 @@ class SummarizationService:
 
             summary.mark_as_completed(text)
 
-            self.metrics_service.increment_summarization('success')
             duration = time.time() - start_time
-            self.metrics_service.observe_summarization_duration(transcription_id, duration)
+            self.metrics_service.increment_summarization('success')
+            # Observe metrics with the provider label
+            self.metrics_service.observe_summarization_duration(
+                transcription_id=transcription_id, 
+                duration=duration, 
+                provider=self.summarizer.provider_name
+            )
 
             logger.info("summarization.completed", transcription_id=transcription_id, duration=duration)
 

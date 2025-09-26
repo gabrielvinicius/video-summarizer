@@ -1,10 +1,10 @@
 # src/metrics/infrastructure/prometheus_provider.py
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram
 from src.metrics.domain.metrics import MetricsProvider
 
 class PrometheusMetricsProvider(MetricsProvider):
     def __init__(self):
-        # --- Métricas HTTP ---
+        # --- HTTP Metrics ---
         self.REQUEST_COUNT = Counter(
             'http_requests_total',
             'Total HTTP Requests',
@@ -16,33 +16,38 @@ class PrometheusMetricsProvider(MetricsProvider):
             ['method', 'endpoint']
         )
 
-        # --- Métricas de Negócio ---
+        # --- Business Metrics ---
         self.VIDEO_UPLOADS_TOTAL = Counter(
             'video_uploads_total',
-            'Total de vídeos enviados',
+            'Total videos uploaded',
             ['status']
         )
         self.TRANSCRIPTIONS_TOTAL = Counter(
             'transcriptions_total',
-            'Total de transcrições processadas',
+            'Total transcriptions processed',
             ['status']
         )
         self.SUMMARIZATIONS_TOTAL = Counter(
             'summarizations_total',
-            'Total de sumarizações geradas',
+            'Total summaries generated',
             ['status']
         )
 
-        # --- Métricas de Duração por Serviço ---
+        # --- Service Duration Metrics with Provider Label ---
+        self.UPLOAD_DURATION = Histogram(
+            'upload_duration_seconds',
+            'Upload processing time per video',
+            ['video_id', 'provider']  # Added provider label
+        )
         self.TRANSCRIPTION_DURATION = Histogram(
             'transcription_duration_seconds',
-            'Tempo de processamento da transcrição por vídeo',
-            ['video_id']
+            'Transcription processing time per video',
+            ['video_id', 'provider']  # Added provider label
         )
         self.SUMMARIZATION_DURATION = Histogram(
             'summarization_duration_seconds',
-            'Tempo de processamento da sumarização por vídeo',
-            ['video_id']
+            'Summarization processing time per video',
+            ['video_id', 'provider']  # Added provider label
         )
 
     def increment_counter(self, name: str, labels: dict = None):

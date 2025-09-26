@@ -2,7 +2,7 @@
 from src.storage.application.storage_service import StorageService, StorageException
 from src.storage.infrastructure.dependencies import register_storage
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union, Optional, Tuple
 import asyncio
 
 
@@ -12,11 +12,15 @@ class LocalStorageService(StorageService):
         self.root = Path("storage")
         self.root.mkdir(exist_ok=True, parents=True)
 
-    async def upload(self, file_path: Union[str, Path], file: bytes) -> None:
+    @property
+    def provider_name(self) -> str:
+        return "local"
+
+    async def upload(self, file_path: Union[str, Path], file: bytes) -> bool:
         path = self.root / file_path
         try:
-            # Run in a separate thread
             await asyncio.to_thread(self._sync_upload, path, file)
+            return True
         except Exception as e:
             raise StorageException("Error saving file locally", e)
 
@@ -25,11 +29,11 @@ class LocalStorageService(StorageService):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(file)
 
-    async def download(self, file_path: Union[str, Path]) -> Optional[bytes]:
+    async def download(self, file_path: Union[str, Path]) -> Optional[Tuple[bytes, str]]:
         path = self.root / file_path
         try:
-            # Run in a separate thread
-            return await asyncio.to_thread(self._sync_download, path)
+            content = await asyncio.to_thread(self._sync_download, path)
+            return content, path.name
         except FileNotFoundError:
             return None
         except Exception as e:
@@ -42,7 +46,6 @@ class LocalStorageService(StorageService):
     async def delete(self, file_path: Union[str, Path]) -> bool:
         path = self.root / file_path
         try:
-            # Run in a separate thread
             return await asyncio.to_thread(self._sync_delete, path)
         except FileNotFoundError:
             return False
